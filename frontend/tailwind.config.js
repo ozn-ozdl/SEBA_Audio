@@ -9,6 +9,18 @@ module.exports = {
   theme: {
     extend: {
       colors: {
+        bg: {
+          primary: "#2C3D50",
+          secondary: "#1C2938",
+        },
+        text: {
+          primary: "#E5E9F2",
+        },
+        button: {
+          primary: "#3ba5ff",
+          secondary: "#006cca",
+        },
+        highlight: "#3B82F6",
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
         ring: "hsl(var(--ring))",
