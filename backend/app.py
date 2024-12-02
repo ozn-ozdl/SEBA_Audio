@@ -8,6 +8,7 @@ import openAI_images.scene_frames_to_descriptions as sftd
 import openAI_images.get_return_values as grv
 
 app = Flask(__name__)
+app.config['MAX_CONTENT_LENGTH'] = 30 * 1024 * 1024
 CORS(app)
 
 UPLOAD_FOLDER = "./uploads"
