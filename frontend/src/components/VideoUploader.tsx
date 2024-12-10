@@ -35,7 +35,7 @@ const VideoUploader: React.FC<VideoUploaderProps> = ({ onProcessVideo }) => {
       alert("Please upload a video and select an action.");
       return;
     }
-    alert("Video submitted! This process will take about 2 minutes.");
+    alert("Video submitted! This process will take up to a few minutes.");
     onProcessVideo(videoFile, selectedAction);
   };
 
