@@ -1,0 +1,10 @@
+flask-cors
+flask
+opencv-python
+scenedetect
+scikit-image
+python-dotenv
+openai
+google-cloud-aiplatform
+google-auth
+google-generativeai
