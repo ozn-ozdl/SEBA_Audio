@@ -79,7 +79,9 @@ const VideoUploader: React.FC<VideoUploaderProps> = ({ onProcessVideo }) => {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="openAI_image">OpenAI with images</SelectItem>
-                <SelectItem value="gemini_video">Gemini only video</SelectItem>
+                <SelectItem value="gemini_whole_video">
+                  Gemini only video
+                </SelectItem>
                 <SelectItem value="gemini_optimized">
                   Gemini optimized
                 </SelectItem>

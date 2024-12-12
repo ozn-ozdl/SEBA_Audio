@@ -6,6 +6,9 @@ import openAI_images.video_to_frames as vtf
 import openAI_images.detect_scene_changes as dsc
 import openAI_images.scene_frames_to_descriptions as sftd
 import openAI_images.get_return_values as grv
+from openAI_images.vidToDesGemini import describe_with_gemini_whole_video, get_video_duration
+import openAI_images.scenes_to_description_optimized_gemini as sg
+
 
 app = Flask(__name__)
 app.config['MAX_CONTENT_LENGTH'] = 30 * 1024 * 1024
@@ -13,15 +16,18 @@ CORS(app)
 
 UPLOAD_FOLDER = "./uploads"
 FRAMES_FOLDER = "./frames"
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-if os.path.exists(FRAMES_FOLDER):
-    shutil.rmtree(FRAMES_FOLDER)
-os.makedirs(FRAMES_FOLDER, exist_ok=True)
-
 SCENES_FOLDER = "./scenes_results"
-if os.path.exists(SCENES_FOLDER):
-    shutil.rmtree(SCENES_FOLDER)
-os.makedirs(SCENES_FOLDER, exist_ok=True)
+
+
+def setup():
+    os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+    if os.path.exists(FRAMES_FOLDER):
+        shutil.rmtree(FRAMES_FOLDER)
+    os.makedirs(FRAMES_FOLDER, exist_ok=True)
+
+    if os.path.exists(SCENES_FOLDER):
+        shutil.rmtree(SCENES_FOLDER)
+    os.makedirs(SCENES_FOLDER, exist_ok=True)
 
 
 @app.route("/")
@@ -40,6 +46,8 @@ def get_scene_files(filename):
 def process_video():
     if "video" not in request.files:
         return jsonify({"error": "No video file provided"}), 400
+
+    setup()
 
     video_file = request.files["video"]
     action = request.form.get("action")
@@ -64,10 +72,28 @@ def process_video():
                 "timestamps": timestamps,
                 "scene_files": scene_files,
             }), 200
-        elif action == "gemini_video":
-            return "Not implemented", 501
+        elif action == "gemini_whole_video":
+            description = describe_with_gemini_whole_video(video_path)
+            video_duration = get_video_duration(video_path)
+            start_time = '00:00:00'
+            end_time = video_duration
+            scene_files = grv.extract_scenes(
+                video_path, [(start_time, end_time)], SCENES_FOLDER)
+            return jsonify({
+                "message": "Scene changes detected successfully",
+                "scene_files": scene_files,
+                "descriptions": [description],
+                "timestamps": [(start_time, end_time)],
+            }), 200
         elif action == "gemini_optimized":
-            return "Not implemented", 501
+            scene_descriptions, timestamps, scene_files = sg.describe_scenes_with_gemini_video(
+                video_path, sg.detect_scenes(video_path), SCENES_FOLDER)
+            return jsonify({
+                "message": "Scene changes detected successfully",
+                "descriptions": scene_descriptions,
+                "timestamps": timestamps,
+                "scene_files": scene_files,
+            }), 200
         else:
             return jsonify({"error": "Invalid action"}), 400
 
