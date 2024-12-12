@@ -1,6 +1,10 @@
-flask-cors==3.0.10
-flask==2.3.2
-opencv-python==4.8.1.78
+flask-cors
+flask
+opencv-python
 scikit-image
 python-dotenv
 openai
+scenedetect
+google-cloud-aiplatform
+google-auth
+google-generativeai
