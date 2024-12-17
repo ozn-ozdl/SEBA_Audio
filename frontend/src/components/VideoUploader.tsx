@@ -1,104 +1,145 @@
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "./ui/select";
-import React, { useState, useRef } from "react";
-import { Button } from "./ui/button";
+import React, { useState, useEffect } from "react";
 
 interface VideoUploaderProps {
   onProcessVideo: (videoFile: File, action: string) => Promise<void>;
 }
 
 const VideoUploader: React.FC<VideoUploaderProps> = ({ onProcessVideo }) => {
-  const [videoFile, setVideoFile] = useState<File | null>(null);
-  const [selectedAction, setSelectedAction] = useState<string>("");
-  const inputRef = useRef<HTMLInputElement | null>(null);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [action, setAction] = useState<string>("");
+  const [timer, setTimer] = useState<number>(0); // Timer to track elapsed time
+  const [isProcessing, setIsProcessing] = useState<boolean>(false); // Flag to track video processing state
 
-  const handleVideoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (files && files.length > 0) {
-      setVideoFile(files[0]);
-    }
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    setSelectedFile(file || null);
   };
-
-  /** 
-  const handleRemoveVideo = () => {
-    setVideoFile("");
-  };
-  **/
 
   const handleSubmit = () => {
-    if (!videoFile || !selectedAction) {
-      alert("Please upload a video and select an action.");
-      return;
+    if (selectedFile && action) {
+      alert("Video submitted! This process will take up to a few minutes.");
+      setIsProcessing(true);
+      console.log("Timer started");
+      setTimer(0); // Reset timer when submitting the video
+      onProcessVideo(selectedFile, action);
+    } else {
+      alert("Please select a video file and an action.");
     }
-    alert("Video submitted! This process will take up to a few minutes.");
-    onProcessVideo(videoFile, selectedAction);
+  };
+
+  useEffect(() => {
+    let intervalId: NodeJS.Timeout | null = null;
+
+    if (isProcessing) {
+      // Start the timer when processing starts
+      intervalId = setInterval(() => {
+        setTimer((prevTimer) => prevTimer + 1);
+      }, 1000); // Update every second
+    }
+
+    // Cleanup the interval on component unmount or when processing ends
+    return () => {
+      if (intervalId) clearInterval(intervalId);
+    };
+  }, [isProcessing]);
+
+  // Simulate video processing completion for this example
+  const handleProcessingComplete = () => {
+    setIsProcessing(false); // Stop the processing state
+    alert("Video processed successfully!");
   };
 
   return (
-    <div className="w-[640px] h-[360px] bg-bg-primary rounded-lg flex items-center justify-center mb-4">
-      <input
-        ref={inputRef}
-        id="video-upload"
-        type="file"
-        accept="video/*"
-        onChange={handleVideoUpload}
-        className="hidden"
-      />
-
-      {!videoFile ? (
-        <div className="flex flex-col items-center">
-          <label
-            htmlFor="video-upload"
-            className="cursor-pointer bg-button-primary px-4 py-2 rounded hover:bg-button-secondary"
-          >
-            Upload Video
+    <div className="bg-white p-6 rounded-lg shadow-md w-full max-w-md">
+      {/* File Upload Section */}
+      <div className="mb-4">
+        <label
+          htmlFor="videoFile"
+          className="block text-sm font-medium text-gray-700 mb-2"
+        >
+          Upload Video
+        </label>
+        <div className="flex items-center justify-center w-full">
+          <label className="flex flex-col items-center justify-center w-full h-64 border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100">
+            <div className="flex flex-col items-center justify-center pt-5 pb-6">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className="w-10 h-10 text-gray-400 mb-3"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M3 16l4-4m0 0l4-4m-4 4h12"
+                />
+              </svg>
+              <p className="mb-2 text-sm text-gray-500">
+                {selectedFile
+                  ? `Selected: ${selectedFile.name}`
+                  : "Click to upload or drag and drop"}
+              </p>
+              <p className="text-xs text-gray-400">MP4, AVI, MOV (Max 10GB)</p>
+            </div>
+            <input
+              type="file"
+              className="hidden"
+              accept="video/*"
+              onChange={handleFileChange}
+            />
           </label>
-          <p className="mt-2 text-sm text-text-primary">
-            Select a video file to upload.
-          </p>
         </div>
-      ) : (
-        <div className="w-full bg-bg-secondary">
-          <video
-            controls
-            className="w-full h-full rounded"
-            src={URL.createObjectURL(videoFile)}
-          >
-            Your browser does not support the video tag.
-          </video>
+      </div>
 
-          <div className="mt-4 flex justify-between items-center text-text-primary">
-            <Select onValueChange={(value) => setSelectedAction(value)}>
-              <SelectTrigger className="w-[200px]  bg-button-primary hover:bg-button-secondary">
-                <SelectValue placeholder="Select Action" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="openAI_image">OpenAI with images</SelectItem>
-                <SelectItem value="gemini_whole_video">
-                  Gemini only video
-                </SelectItem>
-                <SelectItem value="gemini_optimized">
-                  Gemini optimized
-                </SelectItem>
-              </SelectContent>
-            </Select>
+      {/* Action Selection Section */}
+      <div className="mb-4">
+        <label
+          htmlFor="action"
+          className="block text-sm font-medium text-gray-700 mb-2"
+        >
+          Select Action
+        </label>
+        <select
+          id="action"
+          value={action}
+          onChange={(e) => setAction(e.target.value)}
+          className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+        >
+          <option value="">Choose an Action</option>
+          <option value="openAI_image">OpenAI with images</option>
+          <option value="gemini_whole_video">Gemini only video</option>
+          <option value="gemini_optimized">Gemini optimized</option>
+        </select>
+      </div>
 
-            <Button
-              onClick={handleSubmit}
-              className=" text-text-primary px-4 py-2 rounded bg-button-primary hover:bg-button-secondary"
-            >
-              Submit
-            </Button>
-          </div>
+      {/* Submit Button */}
+      <button
+        onClick={handleSubmit}
+        disabled={!selectedFile || !action}
+        className="w-full bg-blue-600 text-white py-2 rounded-md hover:bg-blue-700 transition-colors duration-300 disabled:bg-gray-400"
+      >
+        Process Video
+      </button>
+
+      {/* Timer Display */}
+      {isProcessing && (
+        <div className="mt-4 text-gray-600">
+          <p>Processing time: {timer} seconds</p>
         </div>
       )}
+
+      {/* Simulate processing complete */}
+      <button
+        onClick={handleProcessingComplete}
+        className="mt-4 bg-green-600 text-white py-2 rounded-md hover:bg-green-500"
+      >
+        Simulate Video Process Completion
+      </button>
     </div>
   );
 };
 
 export default VideoUploader;
+

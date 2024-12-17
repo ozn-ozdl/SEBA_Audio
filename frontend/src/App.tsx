@@ -1,87 +1,20 @@
-import "./App.css";
+import React, { useState } from "react";
 import VideoUploader from "./components/VideoUploader";
-import { VideoDescription } from "./components/VideoDescription";
-import { useState } from "react";
+import VideoDescription from "./components/VideoDescription";
+import { Video } from "lucide-react";
+import "./App.css";
 
-//TODO: manuell component distances to automatic ones
-function App() {
-  const exampleDescriptions = [
-    {
-      startTime: "00:00:00",
-      endTime: "00:00:03",
-      description: "This is a video description.",
-      videoUrl: "",
-    },
-    {
-      startTime: "00:00:03",
-      endTime: "00:00:10",
-      description: "This is a video description.",
-      videoUrl: "",
-    },
-    {
-      startTime: "00:00:10",
-      endTime: "00:00:15",
-      description: "This is a video description.",
-      videoUrl: "",
-    },
-    {
-      startTime: "00:00:15",
-      endTime: "00:00:16",
-      description: "This is a video description.",
-      videoUrl: "",
-    },
-    {
-      startTime: "00:00:16",
-      endTime: "00:00:18",
-      description: "This is a video description.",
-      videoUrl: "",
-    },
-    {
-      startTime: "00:00:18",
-      endTime: "00:00:22",
-      description: "This is a video description.",
-      videoUrl: "",
-    },
-    {
-      startTime: "00:00:22",
-      endTime: "00:00:26",
-      description: "This is a video description.",
-      videoUrl: "",
-    },
-    {
-      startTime: "00:00:26",
-      endTime: "00:00:30",
-      description: "This is a video description.",
-      videoUrl: "",
-    },
-    {
-      startTime: "00:00:30",
-      endTime: "00:00:33",
-      description: "This is a video description.",
-      videoUrl: "",
-    },
-    {
-      startTime: "00:00:33",
-      endTime: "00:00:40",
-      description: "This is a video description.",
-      videoUrl: "",
-    },
-    {
-      startTime: "00:00:40",
-      endTime: "00:00:42",
-      description: "This is a video description.",
-      videoUrl: "",
-    },
-    {
-      startTime: "00:00:42",
-      endTime: "00:00:49",
-      description: "This is a video description.",
-      videoUrl: "",
-    },
-  ];
+// Main App Component
+const App: React.FC = () => {
+  interface VideoDescriptionItem {
+    startTime: string;
+    endTime: string;
+    description: string;
+    videoUrl: string;
+  }
 
-  const [videoDescriptions, setVideoDescriptions] =
-    useState(exampleDescriptions);
+  const [videoDescriptions, setVideoDescriptions] = useState<VideoDescriptionItem[]>([]);
+  const [uploadedVideo, setUploadedVideo] = useState<File | null>(null); // To store the uploaded video file
 
   const handleProcessVideo = async (videoFile: File, action: string) => {
     if (!action) {
@@ -101,15 +34,14 @@ function App() {
 
       if (response.ok) {
         const result = await response.json();
-        const processedDescriptions = result.timestamps.map(
-          (timestamp: any, index: number) => ({
-            startTime: timestamp[0],
-            endTime: timestamp[1],
-            description: result.descriptions[index],
-            videoUrl: `http://localhost:5000/scene_files/${result.scene_files[index]}`,
-          })
-        );
+        const processedDescriptions = result.timestamps.map((timestamp: any, index: number) => ({
+          startTime: timestamp[0],
+          endTime: timestamp[1],
+          description: result.descriptions[index],
+          videoUrl: `http://localhost:5000/scene_files/${result.scene_files[index]}`,
+        }));
 
+        setUploadedVideo(videoFile); // Store the uploaded video for subtitle encoding
         setVideoDescriptions(processedDescriptions);
       } else {
         alert("Error processing video");
@@ -119,27 +51,95 @@ function App() {
     }
   };
 
+  const handleEncodeVideo = async () => {
+    if (!uploadedVideo || videoDescriptions.length === 0) {
+      alert("Please process a video and ensure descriptions are available.");
+      return;
+    }
+
+    const descriptions = videoDescriptions.map((item) => item.description);
+    const timestamps = videoDescriptions.map((item) => [item.startTime, item.endTime]);
+
+    const jsonPayload = {
+      descriptions,
+      timestamps,
+      videoFileName: uploadedVideo.name,
+    };
+
+    try {
+      const encodeResponse = await fetch("http://localhost:5000/encode-video-with-subtitles", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(jsonPayload),
+      });
+
+      if (encodeResponse.ok) {
+        const result = await encodeResponse.json();
+        const downloadUrl = `http://localhost:5000${result.output_video_url}`;
+
+        // Create a temporary anchor element to trigger the download
+        const link = document.createElement("a");
+        link.href = downloadUrl;
+        link.download = result.output_video_url.split("/").pop(); // Set the default filename
+        link.click(); // Simulate the click to start the download
+      } else {
+        alert("Error encoding video with subtitles");
+      }
+    } catch (error) {
+      alert("Error connecting to backend");
+    }
+  };
+
+  const handleDescriptionChange = (updatedDescriptions: VideoDescriptionItem[]) => {
+    setVideoDescriptions(updatedDescriptions);
+  };
+
   return (
-    <div className="bg-bg-secondary h-screen flex flex-col overflow-hidden">
-      <header className="bg-bg-primary  text-text-primary py-4 px-6 flex justify-center">
-        <h1 className="text-lg font-semibold">Video Descriptions</h1>
+    <div className="min-h-screen bg-gradient-to-br from-indigo-900 via-purple-700 to-indigo-600 flex flex-col">
+      <header className="bg-white shadow-md">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
+          <h1 className="text-2xl font-bold text-white flex items-center">
+            <Video className="mr-3 text-yellow-400" />
+            Video Description Generator
+          </h1>
+        </div>
       </header>
 
-      <div className="flex flex-1">
-        <div className="w-2/3 p-4 border-r border-gray-700">
-          <div className="bg-bg-secondary text-text-primary py-2 rounded-t-md mb-4">
-            <h2 className="text-md font-semibold">Textual Descriptions</h2>
-          </div>
-
-          <VideoDescription videoDescriptions={videoDescriptions} />
+      <main className="flex-1 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 grid md:grid-cols-3 gap-8">
+        <div className="md:col-span-2 bg-white rounded-lg shadow-md p-6">
+          <h2 className="text-xl font-semibold text-gray-800 mb-4 border-b pb-2">
+            Scene Descriptions
+          </h2>
+          <VideoDescription
+            videoDescriptions={videoDescriptions}
+            onDescriptionChange={handleDescriptionChange}
+          />
+          {videoDescriptions.length > 0 && (
+            <div className="mt-4 text-center">
+              <button
+                onClick={handleEncodeVideo}
+                className="bg-yellow-400 text-indigo-900 px-6 py-3 rounded-md shadow-md hover:bg-yellow-500 transition-all"
+              >
+                Finalize and Encode Video
+              </button>
+            </div>
+          )}
         </div>
 
-        <div className="w-1/3 p-4 flex flex-col items-center justify-center">
+        <div className="md:col-span-1">
           <VideoUploader onProcessVideo={handleProcessVideo} />
         </div>
-      </div>
+      </main>
+
+      <footer className="bg-white shadow-md py-4">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center text-gray-500">
+          © 2024 Video Description Generator
+        </div>
+      </footer>
     </div>
   );
-}
+};
 
 export default App;

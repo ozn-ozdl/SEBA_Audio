@@ -1,5 +1,81 @@
-import React, { useEffect, useState } from "react";
-import { Textarea } from "./ui/textarea";
+// import React, { useEffect, useState } from "react";
+
+// interface VideoDescriptionItem {
+//   startTime: string;
+//   endTime: string;
+//   description: string;
+//   videoUrl: string;
+// }
+
+// interface Props {
+//   videoDescriptions: VideoDescriptionItem[];
+// }
+
+// const VideoDescription: React.FC<Props> = ({ videoDescriptions }) => {
+//   const [combinedDescriptions, setCombinedDescriptions] = useState("");
+
+//   useEffect(() => {
+//     // Combine all descriptions into one string.
+//     const combinedText = videoDescriptions.map((item) => item.description).join(" ");
+//     setCombinedDescriptions(combinedText);
+//     console.log("Combined Descriptions:", combinedText);
+//   }, [videoDescriptions]);
+
+//   const handleAudioDescriptionClick = () => {
+//     if (!combinedDescriptions) {
+//       console.error("No text to convert to speech.");
+//       alert("No descriptions available for audio.");
+//       return;
+//     }
+
+//     // Simulate audio description functionality here.
+//     alert("Playing audio description...");
+//     // Additional logic for audio generation can be integrated.
+//   };
+
+//   return (
+//     <div className="space-y-4">
+//       {videoDescriptions.length === 0 ? (
+//         <p className="text-gray-500 text-sm">No descriptions available. Process a video to get started.</p>
+//       ) : (
+//         <ul className="space-y-2">
+//           {videoDescriptions.map((item, index) => (
+//             <li key={index} className="border p-4 rounded-md">
+//               <p className="font-semibold">
+//                 Scene {index + 1}: {item.startTime} - {item.endTime}
+//               </p>
+//               <p className="text-gray-700">{item.description}</p>
+//               <a
+//                 href={item.videoUrl}
+//                 target="_blank"
+//                 rel="noopener noreferrer"
+//                 className="text-blue-500 hover:underline text-sm"
+//               >
+//                 View Scene
+//               </a>
+//             </li>
+//           ))}
+//         </ul>
+//       )}
+
+//       {videoDescriptions.length > 0 && (
+//         <div className="text-center">
+//           <button
+//             onClick={handleAudioDescriptionClick}
+//             className="px-6 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+//           >
+//             Play Audio Description
+//           </button>
+//         </div>
+//       )}
+//     </div>
+//   );
+// };
+
+// export default VideoDescription;
+
+
+import React, { useState, useEffect } from "react";
 
 interface VideoDescriptionItem {
   startTime: string;
@@ -10,123 +86,60 @@ interface VideoDescriptionItem {
 
 interface Props {
   videoDescriptions: VideoDescriptionItem[];
+  onDescriptionChange: (updatedDescriptions: VideoDescriptionItem[]) => void;
 }
 
-export const VideoDescription: React.FC<Props> = ({ videoDescriptions }) => {
-  const [combinedDescriptions, setCombinedDescriptions] = useState("");
+const VideoDescription: React.FC<Props> = ({ videoDescriptions, onDescriptionChange }) => {
+  const [editableDescriptions, setEditableDescriptions] = useState<VideoDescriptionItem[]>([]);
 
   useEffect(() => {
-    // Collect all descriptions into an array and combine them.
-    const descriptionsArray = videoDescriptions.map((item) => item.description);
-    const combinedText = descriptionsArray.join(" ");
-    setCombinedDescriptions(combinedText);
-
-    // Log the combined descriptions.
-    console.log(combinedText);
+    // Set the editable descriptions to the videoDescriptions passed in as props
+    setEditableDescriptions(videoDescriptions);
   }, [videoDescriptions]);
 
-  const handleAudioDescriptionClick = () => {
-    if (!combinedDescriptions) {
-      console.error("No text to convert to speech.");
-      return;
-    }
-  
-    const speech = new SpeechSynthesisUtterance(combinedDescriptions);
-  
-    speech.lang = "en-US";
-    speech.rate = 1; 
-    speech.pitch = 1; 
+  const handleDescriptionChange = (index: number, newDescription: string) => {
+    const updatedDescriptions = [...editableDescriptions];
+    updatedDescriptions[index].description = newDescription;
+    setEditableDescriptions(updatedDescriptions);
 
-    speechSynthesis.speak(speech);
-  
-    console.log("Playing audio description.");
+    // Pass the updated descriptions back to the parent component
+    onDescriptionChange(updatedDescriptions);
   };
 
-  // const handleAudioDescriptionClick = async () => {
-  //   try {
-  //     const response = await fetch("http://localhost:5000/text_to_speech", {
-  //       method: "POST",
-  //       headers: {
-  //         "Content-Type": "application/json",
-  //       },
-  //       body: JSON.stringify({ text: combinedDescriptions }),
-  //     });
-  
-  //     if (!response.ok) {
-  //       throw new Error("Failed to generate audio description");
-  //     }
-  
-  //     // Create a blob from the response
-  //     const blob = await response.blob();
-  
-  //     // Generate a URL for the blob
-  //     const audioUrl = URL.createObjectURL(blob);
-  
-  //     // Play the audio
-  //     const audio = new Audio(audioUrl);
-  //     audio.play();
-  
-  //     console.log("Audio description played successfully");
-  //   } catch (error) {
-  //     console.error("Error playing audio description:", error);
-  //   }
-  // };
-  
   return (
-    <div className="h-[calc(100vh-160px)] overflow-y-auto bg-bg-primary rounded shadow-lg border border-gray-700 p-4">
-      {videoDescriptions.length > 0 ? (
-        videoDescriptions.map((item, index) => (
-          <div
-            key={index}
-            className="relative flex items-center justify-between py-6 border-b border-gray-600"
-          >
-            <div className="absolute top-4 bg-bg-secondary text-white text-xs font-bold px-2 py-1 rounded">
-              {index + 1}
-            </div>
-
-            <div className="w-1/5 text-sm text-text-primary">
-              <p>{item.startTime}</p>
-              <p>{item.endTime}</p>
-            </div>
-
-            <div className="w-3/5 px-4">
-              <div className="bg-bg-secondary text-sm text-text-primary rounded border border-gray-700">
-                <Textarea
-                  className="h-24"
-                  placeholder={
-                    "Here will be your video description of the certain scene."
-                  }
-                  value={item.description}
-                  id="index"
-                ></Textarea>
-              </div>
-            </div>
-            <div className="w-1/5">
-              <video
-                src={item.videoUrl}
-                controls
-                className="w-full h-auto rounded"
-              ></video>{" "}
-            </div>
-          </div>
-        ))
+    <div className="space-y-4">
+      {editableDescriptions.length === 0 ? (
+        <p className="text-gray-500 text-sm">No descriptions available. Process a video to get started.</p>
       ) : (
-        <div className="text-center py-4">
-          <p className="text-gray-400">No descriptions available.</p>
-        </div>
+        <ul className="space-y-2">
+          {editableDescriptions.map((item, index) => (
+            <li key={index} className="border p-4 rounded-md">
+              <p className="font-semibold">
+                Scene {index + 1}: {item.startTime} - {item.endTime}
+              </p>
+
+              {/* Editable description field */}
+              <textarea
+                value={item.description}
+                onChange={(e) => handleDescriptionChange(index, e.target.value)}
+                className="w-full mt-2 p-2 border rounded-md"
+                rows={4}
+              />
+
+              <a
+                href={item.videoUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-blue-500 hover:underline text-sm"
+              >
+                View Scene
+              </a>
+            </li>
+          ))}
+        </ul>
       )}
-      <div className="text-center mt-4">
-      {videoDescriptions.every(
-          (item) => item.description !== "This is a video description."
-        ) && (
-        <button
-          onClick={handleAudioDescriptionClick}
-          className="px-6 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
-        >
-          Audio Description
-        </button>
-        )}
-      </div>
     </div>
   );
 };
+
+export default VideoDescription;
