@@ -1,7 +1,6 @@
 import React from "react";
 import { Button } from "./components/ui/button";
 
-// TODO: change video src to demo video, upload demo video to /public/demo and upload it to the server
 const LandingPage: React.FC = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-indigo-900 via-purple-600 to-indigo-500 flex flex-col items-center justify-start text-white">

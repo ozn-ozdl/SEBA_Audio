@@ -21,7 +21,6 @@ const VideoDescription: React.FC<Props> = ({
   >([]);
 
   useEffect(() => {
-    // Set the editable descriptions to the videoDescriptions passed in as props
     setEditableDescriptions(videoDescriptions);
   }, [videoDescriptions]);
 
@@ -30,7 +29,6 @@ const VideoDescription: React.FC<Props> = ({
     updatedDescriptions[index].description = newDescription;
     setEditableDescriptions(updatedDescriptions);
 
-    // Pass the updated descriptions back to the parent component
     onDescriptionChange(updatedDescriptions);
   };
 
@@ -50,8 +48,6 @@ const VideoDescription: React.FC<Props> = ({
               <p className="font-semibold">
                 Scene {index + 1}: {item.startTime} - {item.endTime}
               </p>
-
-              {/* Editable description field */}
               <textarea
                 value={item.description}
                 onChange={(e) => handleDescriptionChange(index, e.target.value)}
