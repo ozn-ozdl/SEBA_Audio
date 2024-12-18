@@ -1,87 +1,32 @@
-import "./App.css";
+import React, { useState, useEffect } from "react";
 import VideoUploader from "./components/VideoUploader";
-import { VideoDescription } from "./components/VideoDescription";
-import { useState } from "react";
+import VideoDescription from "./components/VideoDescription";
+import { Video, Play, Pause } from "lucide-react";
+import "./App.css";
 
-//TODO: manuell component distances to automatic ones
-function App() {
-  const exampleDescriptions = [
-    {
-      startTime: "00:00:00",
-      endTime: "00:00:03",
-      description: "This is a video description.",
-      videoUrl: "",
-    },
-    {
-      startTime: "00:00:03",
-      endTime: "00:00:10",
-      description: "This is a video description.",
-      videoUrl: "",
-    },
-    {
-      startTime: "00:00:10",
-      endTime: "00:00:15",
-      description: "This is a video description.",
-      videoUrl: "",
-    },
-    {
-      startTime: "00:00:15",
-      endTime: "00:00:16",
-      description: "This is a video description.",
-      videoUrl: "",
-    },
-    {
-      startTime: "00:00:16",
-      endTime: "00:00:18",
-      description: "This is a video description.",
-      videoUrl: "",
-    },
-    {
-      startTime: "00:00:18",
-      endTime: "00:00:22",
-      description: "This is a video description.",
-      videoUrl: "",
-    },
-    {
-      startTime: "00:00:22",
-      endTime: "00:00:26",
-      description: "This is a video description.",
-      videoUrl: "",
-    },
-    {
-      startTime: "00:00:26",
-      endTime: "00:00:30",
-      description: "This is a video description.",
-      videoUrl: "",
-    },
-    {
-      startTime: "00:00:30",
-      endTime: "00:00:33",
-      description: "This is a video description.",
-      videoUrl: "",
-    },
-    {
-      startTime: "00:00:33",
-      endTime: "00:00:40",
-      description: "This is a video description.",
-      videoUrl: "",
-    },
-    {
-      startTime: "00:00:40",
-      endTime: "00:00:42",
-      description: "This is a video description.",
-      videoUrl: "",
-    },
-    {
-      startTime: "00:00:42",
-      endTime: "00:00:49",
-      description: "This is a video description.",
-      videoUrl: "",
-    },
-  ];
+const App: React.FC = () => {
+  const synth = window.speechSynthesis;
+  interface VideoDescriptionItem {
+    startTime: string;
+    endTime: string;
+    description: string;
+    videoUrl: string;
+  }
 
-  const [videoDescriptions, setVideoDescriptions] =
-    useState(exampleDescriptions);
+  const [videoDescriptions, setVideoDescriptions] = useState<
+    VideoDescriptionItem[]
+  >([]);
+  const [uploadedVideo, setUploadedVideo] = useState<File | null>(null);
+  const [combinedDescriptions, setCombinedDescriptions] = useState("");
+  const [speechActive, setSpeechActive] = useState(false);
+  const [speechUtterance, setSpeechUtterance] =
+    useState<SpeechSynthesisUtterance | null>(null);
+
+  useEffect(() => {
+    const descriptionsArray = videoDescriptions.map((item) => item.description);
+    const combinedText = descriptionsArray.join(" ");
+    setCombinedDescriptions(combinedText);
+  }, [videoDescriptions]);
 
   const handleProcessVideo = async (videoFile: File, action: string) => {
     if (!action) {
@@ -110,6 +55,7 @@ function App() {
           })
         );
 
+        setUploadedVideo(videoFile);
         setVideoDescriptions(processedDescriptions);
       } else {
         alert("Error processing video");
@@ -119,27 +65,146 @@ function App() {
     }
   };
 
+  const handleEncodeVideo = async () => {
+    if (!uploadedVideo || videoDescriptions.length === 0) {
+      alert("Please process a video and ensure descriptions are available.");
+      return;
+    }
+
+    const descriptions = videoDescriptions.map((item) => item.description);
+    const timestamps = videoDescriptions.map((item) => [
+      item.startTime,
+      item.endTime,
+    ]);
+
+    const jsonPayload = {
+      descriptions,
+      timestamps,
+      videoFileName: uploadedVideo.name,
+    };
+
+    try {
+      const encodeResponse = await fetch(
+        "http://localhost:5000/encode-video-with-subtitles",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(jsonPayload),
+        }
+      );
+
+      if (encodeResponse.ok) {
+        const result = await encodeResponse.json();
+        const downloadUrl = `http://localhost:5000${result.output_video_url}`;
+
+        const link = document.createElement("a");
+        link.href = downloadUrl;
+        link.download = result.output_video_url.split("/").pop();
+        link.click();
+      } else {
+        alert("Error encoding video with subtitles");
+      }
+    } catch (error) {
+      alert("Error connecting to backend");
+    }
+  };
+
+  const toggleAudioDescription = () => {
+    if (!speechActive) {
+      const speech = new SpeechSynthesisUtterance(combinedDescriptions);
+      speech.lang = "en-US";
+
+      synth.speak(speech);
+      setSpeechActive(true);
+      setSpeechUtterance(speech);
+    } else {
+      synth.cancel();
+      setSpeechActive(false);
+    }
+  };
+
+  const handleDescriptionChange = (
+    updatedDescriptions: VideoDescriptionItem[]
+  ) => {
+    setVideoDescriptions(updatedDescriptions);
+  };
+
+  const resetAppState = () => {
+    synth.cancel();
+    setVideoDescriptions([]);
+    setUploadedVideo(null);
+    setCombinedDescriptions("");
+    setSpeechActive(false);
+    setSpeechUtterance(null);
+  };
+
   return (
-    <div className="bg-bg-secondary h-screen flex flex-col overflow-hidden">
-      <header className="bg-bg-primary  text-text-primary py-4 px-6 flex justify-center">
-        <h1 className="text-lg font-semibold">Video Descriptions</h1>
+    <div className="min-h-screen bg-gradient-to-br from-indigo-900 via-purple-700 to-indigo-600 flex flex-col">
+      <header className="bg-white shadow-md">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
+          <h1 className="text-2xl font-bold text-black flex items-center">
+            <Video className="mr-3 text-yellow-400" />
+            Video Description Generator
+          </h1>
+        </div>
       </header>
 
-      <div className="flex flex-1">
-        <div className="w-2/3 p-4 border-r border-gray-700">
-          <div className="bg-bg-secondary text-text-primary py-2 rounded-t-md mb-4">
-            <h2 className="text-md font-semibold">Textual Descriptions</h2>
-          </div>
-
-          <VideoDescription videoDescriptions={videoDescriptions} />
+      <main className="flex-1 w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 grid md:grid-cols-2 gap-8">
+        <div className="md:col-span-1 bg-white rounded-lg shadow-md p-6 ">
+          <h2 className="text-xl font-semibold text-gray-800 mb-4 border-b pb-2">
+            Scene Descriptions
+          </h2>
+          <VideoDescription
+            videoDescriptions={videoDescriptions}
+            onDescriptionChange={handleDescriptionChange}
+          />
         </div>
 
-        <div className="w-1/3 p-4 flex flex-col items-center justify-center">
+        <div className="md:col-span-1">
           <VideoUploader onProcessVideo={handleProcessVideo} />
+          <div>
+            {videoDescriptions.length > 0 && (
+              <div className="mt-4 flex flex-col items-start gap-2">
+                <button
+                  onClick={handleEncodeVideo}
+                  className="bg-yellow-400 text-indigo-900 px-6 py-3 rounded-md shadow-md hover:bg-yellow-500 transition-all"
+                >
+                  Finalize and Encode Video
+                </button>
+                <button
+                  onClick={toggleAudioDescription}
+                  className="bg-green-400 text-indigo-900 px-6 py-3 rounded-md shadow-md hover:bg-green-500 transition-all flex items-center gap-2"
+                >
+                  {synth.speaking ? (
+                    <>
+                      <Pause size={20} /> Stop Audio
+                    </>
+                  ) : (
+                    <>
+                      <Play size={20} /> Play Audio
+                    </>
+                  )}
+                </button>
+              </div>
+            )}
+          </div>
         </div>
-      </div>
+      </main>
+
+      <footer className="bg-white shadow-md py-4">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center text-gray-500">
+          <button
+            onClick={resetAppState}
+            className="bg-red-500 text-white px-6 py-3 rounded-md shadow-md hover:bg-red-600 transition-all"
+          >
+            Reset Application
+          </button>
+        </div>
+      </footer>
     </div>
   );
-}
+};
 
 export default App;
