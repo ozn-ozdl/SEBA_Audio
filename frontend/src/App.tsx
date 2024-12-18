@@ -1,11 +1,11 @@
-// import React, { useState } from "react";
+// import React, { useState, useEffect } from "react";
 // import VideoUploader from "./components/VideoUploader";
 // import VideoDescription from "./components/VideoDescription";
-// import { Video } from "lucide-react";
+// import { Video, Play, Pause } from "lucide-react";
 // import "./App.css";
 
-// // Main App Component
 // const App: React.FC = () => {
+//   const synth = window.speechSynthesis;
 //   interface VideoDescriptionItem {
 //     startTime: string;
 //     endTime: string;
@@ -16,7 +16,21 @@
 //   const [videoDescriptions, setVideoDescriptions] = useState<
 //     VideoDescriptionItem[]
 //   >([]);
-//   const [uploadedVideo, setUploadedVideo] = useState<File | null>(null); // To store the uploaded video file
+//   const [uploadedVideo, setUploadedVideo] = useState<File | null>(null);
+//   const [combinedDescriptions, setCombinedDescriptions] = useState("");
+//   const [speechActive, setSpeechActive] = useState(false);
+//   const [speechUtterance, setSpeechUtterance] =
+//     useState<SpeechSynthesisUtterance | null>(null);
+
+//   useEffect(() => {
+//     // Collect all descriptions into an array and combine them.
+//     const descriptionsArray = videoDescriptions.map((item) => item.description);
+//     const combinedText = descriptionsArray.join(" ");
+//     setCombinedDescriptions(combinedText);
+
+//     // Log the combined descriptions.
+//     console.log(combinedText);
+//   }, [videoDescriptions]);
 
 //   const handleProcessVideo = async (videoFile: File, action: string) => {
 //     if (!action) {
@@ -45,7 +59,7 @@
 //           })
 //         );
 
-//         setUploadedVideo(videoFile); // Store the uploaded video for subtitle encoding
+//         setUploadedVideo(videoFile);
 //         setVideoDescriptions(processedDescriptions);
 //       } else {
 //         alert("Error processing video");
@@ -92,13 +106,47 @@
 //         // Create a temporary anchor element to trigger the download
 //         const link = document.createElement("a");
 //         link.href = downloadUrl;
-//         link.download = result.output_video_url.split("/").pop(); // Set the default filename
-//         link.click(); // Simulate the click to start the download
+//         link.download = result.output_video_url.split("/").pop();
+//         link.click();
 //       } else {
 //         alert("Error encoding video with subtitles");
 //       }
 //     } catch (error) {
 //       alert("Error connecting to backend");
+//     }
+//   };
+
+//   const toggleAudioDescription = () => {
+//     // If speech is not active, start speaking
+//     if (!speechActive) {
+//       // const speech = new SpeechSynthesisUtterance(combinedDescriptions);
+//       // speech.lang = "en-US";
+//       // speech.rate = 1;
+//       // speech.pitch = 1;
+//       // console.log("set speech")
+
+//       // console.log("speaking")
+//       // setSpeechActive(true)
+//       // setSpeechUtterance(speech);
+
+//       const speech = new SpeechSynthesisUtterance(combinedDescriptions);
+
+//       speech.lang = "en-US";
+//       speech.rate = 1;
+//       speech.pitch = 1;
+
+//       synth.speak(speech);
+
+//       console.log("Playing audio description.");
+//       console.log("Queued", synth.pending);
+//       console.log("Paused ", synth.paused);
+//       console.log("Playing ", synth.speaking);
+//     } else {
+//       // If speech is active, cancel it
+//       if (speechUtterance) {
+//         synth.pause();
+//       }
+//       setSpeechActive(false);
 //     }
 //   };
 
@@ -134,12 +182,26 @@
 //           <VideoUploader onProcessVideo={handleProcessVideo} />
 //           <div>
 //             {videoDescriptions.length > 0 && (
-//               <div className="mt-4 text-center">
+//               <div className="mt-4 flex flex-col items-start gap-2">
 //                 <button
 //                   onClick={handleEncodeVideo}
 //                   className="bg-yellow-400 text-indigo-900 px-6 py-3 rounded-md shadow-md hover:bg-yellow-500 transition-all"
 //                 >
 //                   Finalize and Encode Video
+//                 </button>
+//                 <button
+//                   onClick={toggleAudioDescription}
+//                   className="bg-green-400 text-indigo-900 px-6 py-3 rounded-md shadow-md hover:bg-green-500 transition-all flex items-center gap-2"
+//                 >
+//                   {synth.speaking ? (
+//                     <>
+//                       <Pause size={20} /> Stop Audio
+//                     </>
+//                   ) : (
+//                     <>
+//                       <Play size={20} /> Play Audio
+//                     </>
+//                   )}
 //                 </button>
 //               </div>
 //             )}
@@ -149,7 +211,7 @@
 
 //       <footer className="bg-white shadow-md py-4">
 //         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center text-gray-500">
-//           © 2024 Video Description Generator
+//           © 2024 NarrifAI
 //         </div>
 //       </footer>
 //     </div>
@@ -158,10 +220,11 @@
 
 // export default App;
 
+
 import React, { useState, useEffect } from "react";
 import VideoUploader from "./components/VideoUploader";
 import VideoDescription from "./components/VideoDescription";
-import { Video } from "lucide-react";
+import { Video, Play, Pause } from "lucide-react";
 import "./App.css";
 
 const App: React.FC = () => {
@@ -176,17 +239,16 @@ const App: React.FC = () => {
   const [videoDescriptions, setVideoDescriptions] = useState<
     VideoDescriptionItem[]
   >([]);
-  const [uploadedVideo, setUploadedVideo] = useState<File | null>(null); // To store the uploaded video file
+  const [uploadedVideo, setUploadedVideo] = useState<File | null>(null);
   const [combinedDescriptions, setCombinedDescriptions] = useState("");
+  const [speechActive, setSpeechActive] = useState(false);
+  const [speechUtterance, setSpeechUtterance] =
+    useState<SpeechSynthesisUtterance | null>(null);
 
   useEffect(() => {
-    // Collect all descriptions into an array and combine them.
     const descriptionsArray = videoDescriptions.map((item) => item.description);
     const combinedText = descriptionsArray.join(" ");
     setCombinedDescriptions(combinedText);
-
-    // Log the combined descriptions.
-    console.log(combinedText);
   }, [videoDescriptions]);
 
   const handleProcessVideo = async (videoFile: File, action: string) => {
@@ -216,7 +278,7 @@ const App: React.FC = () => {
           })
         );
 
-        setUploadedVideo(videoFile); // Store the uploaded video for subtitle encoding
+        setUploadedVideo(videoFile);
         setVideoDescriptions(processedDescriptions);
       } else {
         alert("Error processing video");
@@ -260,11 +322,10 @@ const App: React.FC = () => {
         const result = await encodeResponse.json();
         const downloadUrl = `http://localhost:5000${result.output_video_url}`;
 
-        // Create a temporary anchor element to trigger the download
         const link = document.createElement("a");
         link.href = downloadUrl;
-        link.download = result.output_video_url.split("/").pop(); // Set the default filename
-        link.click(); // Simulate the click to start the download
+        link.download = result.output_video_url.split("/").pop();
+        link.click();
       } else {
         alert("Error encoding video with subtitles");
       }
@@ -273,27 +334,33 @@ const App: React.FC = () => {
     }
   };
 
-  const handleAudioDescriptionClick = () => {
-    if (!combinedDescriptions) {
-      console.error("No text to convert to speech.");
-      return;
+  const toggleAudioDescription = () => {
+    if (!speechActive) {
+      const speech = new SpeechSynthesisUtterance(combinedDescriptions);
+      speech.lang = "en-US";
+
+      synth.speak(speech);
+      setSpeechActive(true);
+      setSpeechUtterance(speech);
+    } else {
+      synth.cancel();
+      setSpeechActive(false);
     }
-
-    const speech = new SpeechSynthesisUtterance(combinedDescriptions);
-
-    speech.lang = "en-US";
-    speech.rate = 1;
-    speech.pitch = 1;
-
-    synth.speak(speech);
-
-    console.log("Playing audio description.");
   };
 
   const handleDescriptionChange = (
     updatedDescriptions: VideoDescriptionItem[]
   ) => {
     setVideoDescriptions(updatedDescriptions);
+  };
+
+  const resetAppState = () => {
+    synth.cancel(); // Stop any active speech
+    setVideoDescriptions([]);
+    setUploadedVideo(null);
+    setCombinedDescriptions("");
+    setSpeechActive(false);
+    setSpeechUtterance(null);
   };
 
   return (
@@ -329,12 +396,20 @@ const App: React.FC = () => {
                 >
                   Finalize and Encode Video
                 </button>
-                {/* <button
-                  onClick={handleAudioDescriptionClick}
-                  className="bg-green-400 text-indigo-900 px-6 py-3 rounded-md shadow-md hover:bg-green-500 transition-all"
+                <button
+                  onClick={toggleAudioDescription}
+                  className="bg-green-400 text-indigo-900 px-6 py-3 rounded-md shadow-md hover:bg-green-500 transition-all flex items-center gap-2"
                 >
-                  Play Audio Description
-                </button> */}
+                  {synth.speaking ? (
+                    <>
+                      <Pause size={20} /> Stop Audio
+                    </>
+                  ) : (
+                    <>
+                      <Play size={20} /> Play Audio
+                    </>
+                  )}
+                </button>
               </div>
             )}
           </div>
@@ -343,7 +418,12 @@ const App: React.FC = () => {
 
       <footer className="bg-white shadow-md py-4">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center text-gray-500">
-          © 2024 NarrifAI
+          <button
+            onClick={resetAppState}
+            className="bg-red-500 text-white px-6 py-3 rounded-md shadow-md hover:bg-red-600 transition-all"
+          >
+            Reset Application
+          </button>
         </div>
       </footer>
     </div>
