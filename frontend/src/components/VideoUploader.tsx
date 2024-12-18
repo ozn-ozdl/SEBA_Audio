@@ -15,13 +15,22 @@ const VideoUploader: React.FC<VideoUploaderProps> = ({ onProcessVideo }) => {
     setSelectedFile(file || null);
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (selectedFile && action) {
       alert("Video submitted! This process will take up to a few minutes.");
       setIsProcessing(true);
       console.log("Timer started");
       setTimer(0); // Reset timer when submitting the video
-      onProcessVideo(selectedFile, action);
+
+      try {
+        await onProcessVideo(selectedFile, action);
+        // Stop the timer once processing is complete
+        setIsProcessing(false);
+        alert("Video processed successfully!");
+      } catch (error) {
+        setIsProcessing(false); // Stop the timer even if an error occurs
+        alert("An error occurred while processing the video.");
+      }
     } else {
       alert("Please select a video file and an action.");
     }
@@ -42,12 +51,6 @@ const VideoUploader: React.FC<VideoUploaderProps> = ({ onProcessVideo }) => {
       if (intervalId) clearInterval(intervalId);
     };
   }, [isProcessing]);
-
-  // Simulate video processing completion for this example
-  const handleProcessingComplete = () => {
-    setIsProcessing(false); // Stop the processing state
-    alert("Video processed successfully!");
-  };
 
   return (
     <div className="bg-white p-6 rounded-lg shadow-md w-full max-w-md">
@@ -107,7 +110,7 @@ const VideoUploader: React.FC<VideoUploaderProps> = ({ onProcessVideo }) => {
           onChange={(e) => setAction(e.target.value)}
           className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
         >
-          <option value="">Choose an Action</option>
+          <option value="" disabled>Choose an Action</option>
           <option value="openAI_image">OpenAI with images</option>
           <option value="gemini_whole_video">Gemini only video</option>
           <option value="gemini_optimized">Gemini optimized</option>
@@ -129,17 +132,8 @@ const VideoUploader: React.FC<VideoUploaderProps> = ({ onProcessVideo }) => {
           <p>Processing time: {timer} seconds</p>
         </div>
       )}
-
-      {/* Simulate processing complete */}
-      <button
-        onClick={handleProcessingComplete}
-        className="mt-4 bg-green-600 text-white py-2 rounded-md hover:bg-green-500"
-      >
-        Simulate Video Process Completion
-      </button>
     </div>
   );
 };
 
 export default VideoUploader;
-
