@@ -23,6 +23,7 @@ PROCESSED_FOLDER = "./processed"
 # Ensure directories exist
 os.makedirs(PROCESSED_FOLDER, exist_ok=True)
 
+
 def setup():
     os.makedirs(UPLOAD_FOLDER, exist_ok=True)
     if os.path.exists(FRAMES_FOLDER):
@@ -89,20 +90,37 @@ def process_video():
                 "descriptions": [description],
                 "timestamps": [(start_time, end_time)],
             }), 200
+
+        # main pipeline process (gemini_optimized)
         elif action == "gemini_optimized":
+            detected_scenes = sg.detect_scenes(video_path)
+
+            talking_timestamps = sg.get_talking_timestamps_with_gemini(
+                video_path).strip().splitlines()
+            if (talking_timestamps != "NO_TALKING"):
+                scenes_timestamps = sg.scene_list_to_string_list(
+                    detected_scenes)
+                talking_timestamps = sg.format_talking_timestamps(
+                    talking_timestamps)
+
+                detected_scenes = sg.combine_speaking_and_scenes(
+                    scenes_timestamps, talking_timestamps)
+
             scene_descriptions, timestamps, scene_files = sg.describe_scenes_with_gemini_video(
-                video_path, sg.detect_scenes(video_path), SCENES_FOLDER)
+                video_path, detected_scenes, SCENES_FOLDER)
             return jsonify({
                 "message": "Scene changes detected successfully",
                 "descriptions": scene_descriptions,
                 "timestamps": timestamps,
                 "scene_files": scene_files,
             }), 200
+
         else:
             return jsonify({"error": "Invalid action"}), 400
-        
+
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
 
 @app.route("/encode-video-with-subtitles", methods=["POST"])
 def encode_video_with_subtitles():
@@ -127,7 +145,8 @@ def encode_video_with_subtitles():
         with open(temp_srt_path, "w") as srt_file:
             srt_file.write(srt_content)
 
-        output_path = os.path.join(PROCESSED_FOLDER, f"processed_{video_file_name}")
+        output_path = os.path.join(
+            PROCESSED_FOLDER, f"processed_{video_file_name}")
 
         ffmpeg_command = [
             "ffmpeg",
@@ -149,6 +168,7 @@ def encode_video_with_subtitles():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+
 @app.route("/processed/<path:filename>", methods=["GET"])
 def get_processed_video(filename):
     try:
@@ -166,6 +186,7 @@ def generate_srt_file(descriptions, timestamps):
         srt_content.append(description)
         srt_content.append("")
     return "\n".join(srt_content)
+
 
 if __name__ == "__main__":
     app.run(debug=True)
