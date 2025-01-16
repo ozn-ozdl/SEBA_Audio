@@ -37,12 +37,23 @@ const TranscriptionEditor: React.FC<VideoTimelineProps> = ({
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const [selectedScene, setSelectedScene] = useState<string | null>(null);
-  const [isDragging, setIsDragging] = useState<boolean>(false);
-  const [draggedSceneStartTime, setDraggedSceneStartTime] = useState<
-    string | null
-  >(null);
-  const [initialMouseX, setInitialMouseX] = useState<number>(0);
-  const [initialStartTime, setInitialStartTime] = useState<number>(0);
+  const [currentSubtitle, setCurrentSubtitle] = useState<string>("");
+
+  // Update current subtitle based on video time
+  useEffect(() => {
+    if (videoDescriptions.length === 0) return;
+
+    const currentTimeInSeconds = currentTime;
+    const currentScene = videoDescriptions.find((scene) => {
+      const startTime = convertTimestampToSeconds(scene.startTime);
+      const endTime = convertTimestampToSeconds(scene.endTime);
+      return (
+        currentTimeInSeconds >= startTime && currentTimeInSeconds <= endTime
+      );
+    });
+
+    setCurrentSubtitle(currentScene?.description || "");
+  }, [currentTime, videoDescriptions]);
 
   // Update video file when uploadedVideo changes
   useEffect(() => {
@@ -60,7 +71,6 @@ const TranscriptionEditor: React.FC<VideoTimelineProps> = ({
       setIsProcessing(true);
       const formData = new FormData();
 
-      // Show processing options dialog
       const action = await showProcessingOptions();
       if (!action) {
         setIsProcessing(false);
@@ -87,10 +97,7 @@ const TranscriptionEditor: React.FC<VideoTimelineProps> = ({
             })
           );
 
-          // Update video descriptions through the parent component
           onDescriptionChange(processedDescriptions);
-
-          // Create and set video URL
           const url = URL.createObjectURL(file);
           setVideoFile(url);
         } else {
@@ -168,6 +175,7 @@ const TranscriptionEditor: React.FC<VideoTimelineProps> = ({
       setIsPlaying(!isPlaying);
     }
   };
+
   const updateSceneText = (sceneStartTime: string, newText: string): void => {
     const updatedDescriptions = videoDescriptions.map((scene) =>
       scene.startTime === sceneStartTime
@@ -177,106 +185,54 @@ const TranscriptionEditor: React.FC<VideoTimelineProps> = ({
     onDescriptionChange(updatedDescriptions);
   };
 
-  // Utility function to convert timestamp to seconds
-  const convertTimestampToSeconds = (timestamp: string): number => {
-    const parts = timestamp.split(":");
-    const seconds = parseFloat(parts.pop() || "0"); // Get the last part as seconds
-    const minutes = parseInt(parts.pop() || "0", 10); // Get the minutes
-    const hours = parseInt(parts.pop() || "0", 10); // Get the hours
-    return hours * 3600 + minutes * 60 + seconds; // Convert to total seconds
+  // Prevent scrolling on the page when hovering over the visualizer
+  const handleMouseEnter = (event: React.MouseEvent) => {
+    event.preventDefault();
+    document.body.style.overflow = "hidden"; // Disable page scroll
   };
 
-  // Start dragging
-  const handleMouseDown = (
-    sceneStartTime: string,
-    event: React.MouseEvent<HTMLDivElement>
-  ): void => {
-    setIsDragging(true);
-    setDraggedSceneStartTime(sceneStartTime);
-    setInitialMouseX(event.clientX);
-    const scene = videoDescriptions.find((s) => s.startTime === sceneStartTime);
-    if (scene) {
-      setInitialStartTime(convertTimestampToSeconds(scene.startTime));
-    }
+  const handleMouseLeave = () => {
+    document.body.style.overflow = "auto"; // Enable page scroll
   };
-
-  // Handle dragging
-  const handleMouseMove = (event: MouseEvent): void => {
-    if (isDragging && draggedSceneStartTime) {
-      const deltaX = event.clientX - initialMouseX;
-      const newEndTime = initialStartTime + deltaX / 100; // Convert pixels to seconds
-      const updatedDescriptions = videoDescriptions.map((scene) => {
-        if (scene.startTime === draggedSceneStartTime) {
-          const newEndTimeFormatted = newEndTime.toFixed(3); // Format to 3 decimal places
-          return { ...scene, endTime: newEndTimeFormatted };
-        }
-        return scene;
-      });
-      onDescriptionChange(updatedDescriptions);
-    }
-  };
-
-  // Stop dragging
-  const handleMouseUp = (): void => {
-    setIsDragging(false);
-    setDraggedSceneStartTime(null);
-  };
-
-  // Add event listeners for mouse move and mouse up
-  useEffect(() => {
-    if (isDragging) {
-      window.addEventListener("mousemove", handleMouseMove);
-      window.addEventListener("mouseup", handleMouseUp);
-    }
-    return () => {
-      window.removeEventListener("mousemove", handleMouseMove);
-      window.removeEventListener("mouseup", handleMouseUp);
-    };
-  }, [isDragging]);
 
   return (
-    <div className="h-screen bg-gray-900 text-gray-200 flex flex-col">
+    <div className="max-w-full overflow-hidden">
       {/* Top Toolbar */}
-      <div className="border-b border-gray-700 p-2 flex items-center justify-between">
-        <div className="flex items-center space-x-2">
-          <button className="p-1.5 hover:bg-gray-700 rounded">
-            <Settings className="w-4 h-4" />
+      <div className="flex justify-between items-center p-4 bg-gray-800 text-white">
+        <div className="flex items-center">
+          <button className="mr-2">
+            <Settings className="text-white" />
           </button>
-          <span className="text-sm">Transcription Editor</span>
+          <span className="text-lg">Transcription Editor</span>
         </div>
-        <div className="flex items-center space-x-2">
-          {isProcessing && (
-            <span className="text-sm text-yellow-400">Processing video...</span>
-          )}
-          <button className="p-1.5 hover:bg-gray-700 rounded">
-            <Maximize2 className="w-4 h-4" />
-          </button>
+        <div className="flex items-center">
+          {isProcessing && <span className="mr-2">Processing video...</span>}
         </div>
       </div>
 
       {/* Main Content Area */}
-      <div className="flex-1 flex">
+      <div className="flex h-screen">
         {/* Left Sidebar - Transcription */}
-        <div className="w-96 border-r border-gray-700 flex flex-col">
-          <div className="p-2 border-b border-gray-700">
-            <span className="text-sm font-medium">Transcription</span>
+        <div className="w-2/5 p-4 bg-gray-100 overflow-y-auto">
+          <div className="mb-4">
+            <span className="font-bold">Transcription</span>
           </div>
-          <div className="flex-1 overflow-y-auto p-2">
+          <div>
             {videoDescriptions.map((scene, index) => (
               <div
                 key={scene.startTime}
                 className={`p-2 mb-2 rounded ${
                   selectedScene === scene.startTime
-                    ? "bg-gray-700"
-                    : "hover:bg-gray-800"
+                    ? "bg-gray-700 text-white"
+                    : "hover:bg-gray-300"
                 }`}
                 onClick={() => setSelectedScene(scene.startTime)}
               >
-                <div className="text-xs text-gray-400 mb-1">
+                <div>
                   {`Scene ${index + 1}: ${scene.startTime} - ${scene.endTime}`}
                 </div>
                 <textarea
-                  className="w-full bg-transparent border border-gray-600 rounded p-2 text-sm"
+                  className="w-full border border-gray-300 rounded p-1"
                   value={scene.description}
                   onChange={(e) =>
                     updateSceneText(scene.startTime, e.target.value)
@@ -288,21 +244,31 @@ const TranscriptionEditor: React.FC<VideoTimelineProps> = ({
         </div>
 
         {/* Preview and Timeline Area */}
-        <div className="flex-1 flex flex-col">
+        <div className="w-3/5 p-4 bg-white flex flex-col">
           {/* Video Preview */}
-          <div className="flex-1 bg-gray-800 flex items-center justify-center">
+          <div className="flex-grow mb-4 relative">
             {videoFile ? (
-              <video
-                ref={videoRef}
-                className="max-h-full max-w-full"
-                src={videoFile}
-                onTimeUpdate={handleTimeUpdate}
-                onLoadedMetadata={handleLoadedMetadata}
-              />
+              <>
+                <video
+                  ref={videoRef}
+                  className="w-full"
+                  src={videoFile}
+                  onTimeUpdate={handleTimeUpdate}
+                  onLoadedMetadata={handleLoadedMetadata}
+                />
+                {/* Subtitle Overlay */}
+                <div className="absolute bottom-8 left-0 right-0 flex justify-center">
+                  <div className="bg-black bg-opacity-50 px-4 py-2 rounded-lg max-w-2xl text-center">
+                    <p className="text-white text-lg font-semibold">
+                      {currentSubtitle}
+                    </p>
+                  </div>
+                </div>
+              </>
             ) : (
-              <div className="text-center">
-                <label className="cursor-pointer hover:bg-gray-700 p-4 rounded flex flex-col items-center">
-                  <Upload className="w-8 h-8 mb-2" />
+              <div className="flex items-center justify-center h-full">
+                <label className="flex items-center cursor-pointer">
+                  <Upload className="mr-2" />
                   <span>Upload Video</span>
                   <input
                     type="file"
@@ -316,114 +282,42 @@ const TranscriptionEditor: React.FC<VideoTimelineProps> = ({
             )}
           </div>
 
-          {/* Timeline Controls */}
-          <div className="h-64 border-t border-gray-700">
-            <div className="p-2 flex items-center space-x-2 border-b border-gray-700">
-              <button
-                className="p-1.5 hover:bg-gray-700 rounded"
-                onClick={togglePlayPause}
-              >
+          {/* Timeline Controls and Visualizer */}
+          <div className="mb-4">
+            <div className="flex items-center mb-2">
+              <button className="mr-2" onClick={togglePlayPause}>
                 {isPlaying ? (
-                  <Pause className="w-4 h-4" />
+                  <Pause className="text-black" />
                 ) : (
-                  <Play className="w-4 h-4" />
+                  <Play className="text-black" />
                 )}
               </button>
-              <button className="p-1.5 hover:bg-gray-700 rounded">
-                <SkipBack className="w-4 h-4" />
+              <button className="mr-2">
+                <SkipBack className="text-black" />
               </button>
-              <div className="flex items-center space-x-2">
-                <Clock className="w-4 h-4" />
-                <span className="text-sm">
+              <div className="flex items-center">
+                <Clock className="mr-1" />
+                <span>
                   {currentTime.toFixed(2)}s / {videoDuration.toFixed(2)}s
                 </span>
               </div>
             </div>
 
-            {/* Timeline */}
-            <div className="relative h-48 overflow-x-auto">
-              {/* Time markers */}
-              <div className="absolute top-0 left-0 right-0 h-8 flex">
-                {[...Array(20)].map((_, i) => (
-                  <div
-                    key={i}
-                    className="flex-none w-24 border-r border-gray-700 relative"
-                  >
-                    <span className="absolute -top-6 left-1 text-xs">{i}s</span>
-                  </div>
-                ))}
-              </div>
-
-              {/* Scenes */}
-              <div className="absolute top-8 left-0 right-0 h-20">
-                {videoDescriptions.map((scene, index) => (
-                  <div
-                    key={scene.startTime}
-                    className="relative transition-colors duration-300 flex flex-col justify-center bg-gray-800 h-20 rounded-lg overflow-hidden border border-gray-300 mb-1"
-                    style={{
-                      left: `${
-                        convertTimestampToSeconds(scene.startTime) * 100
-                      }px`, // Convert to number
-                      width: `${
-                        (convertTimestampToSeconds(scene.endTime) -
-                          convertTimestampToSeconds(scene.startTime)) *
-                        100
-                      }px`, // Convert to number
-                    }}
-                    onMouseDown={(e) => handleMouseDown(scene.startTime, e)}
-                  >
-                    {/* Left Resize Handle */}
-                    <div
-                      className="absolute w-2 h-full transition-all duration-300 z-10 left-0 cursor-col-resize"
-                      onMouseDown={(e) => handleMouseDown(scene.startTime, e)}
-                    >
-                      <div className="w-full h-full bg-gray-600 flex items-center justify-center">
-                        <span className="text-white">☰</span>
-                      </div>
-                    </div>
-
-                    {/* Right Resize Handle */}
-                    <div
-                      className="absolute w-2 h-full transition-all duration-300 z-10 right-0 cursor-col-resize"
-                      onMouseDown={(e) => handleMouseDown(scene.startTime, e)}
-                    >
-                      <div className="w-full h-full bg-gray-600 flex items-center justify-center">
-                        <span className="text-white">☰</span>
-                      </div>
-                    </div>
-
-                    {/* Scene Header */}
-                    <div className="h-3 bg-teal-500 flex items-center justify-center">
-                      <span className="text-white">{`Scene ${index + 1}`}</span>
-                    </div>
-
-                    {/* Scene Description */}
-                    <div className="m-2 text-sm text-gray-200">
-                      {scene.description} {/* Display the full description */}
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              {/* Video Timeline */}
-              <div className="absolute bottom-0 left-0 right-0 h-16 bg-gray-800">
-                {videoFile && (
-                  <div className="absolute inset-0 bg-gray-600">
-                    <div
-                      className="absolute bg-gray-400 h-full"
-                      style={{
-                        width: `${currentTime * 100}px`,
-                        maxWidth: `${videoDuration * 100}px`,
-                      }}
-                    />
-                  </div>
-                )}
-              </div>
+            {/* Timeline Visualizer */}
+            <div
+              className="overflow-x-auto"
+              onMouseEnter={handleMouseEnter}
+              onMouseLeave={handleMouseLeave}
+            >
+              <TimelineVisualizer
+                videoDescriptions={videoDescriptions}
+                currentTime={currentTime}
+                onDescriptionChange={onDescriptionChange}
+              />
             </div>
           </div>
         </div>
       </div>
-      <TimelineVisualizer />
     </div>
   );
 };
@@ -431,10 +325,10 @@ const TranscriptionEditor: React.FC<VideoTimelineProps> = ({
 // Utility function to convert timestamp to seconds
 const convertTimestampToSeconds = (timestamp: string): number => {
   const parts = timestamp.split(":");
-  const seconds = parseFloat(parts.pop() || "0"); // Get the last part as seconds
-  const minutes = parseInt(parts.pop() || "0", 10); // Get the minutes
-  const hours = parseInt(parts.pop() || "0", 10); // Get the hours
-  return hours * 3600 + minutes * 60 + seconds; // Convert to total seconds
+  const seconds = parseFloat(parts.pop() || "0");
+  const minutes = parseInt(parts.pop() || "0", 10);
+  const hours = parseInt(parts.pop() || "0", 10);
+  return hours * 3600 + minutes * 60 + seconds;
 };
 
 export default TranscriptionEditor;

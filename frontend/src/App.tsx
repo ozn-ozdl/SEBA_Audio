@@ -82,16 +82,16 @@ const App: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-indigo-900 via-purple-700 to-indigo-600 flex flex-col">
-      <header className="bg-white shadow-md">
+      {/* <header className="bg-white shadow-md">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
           <h1 className="text-2xl font-bold text-black flex items-center">
             <Video className="mr-3 text-yellow-400" />
             Video Description Generator
           </h1>
         </div>
-      </header>
+      </header> */}
 
-      <main className="flex-1 w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 grid md:grid-cols-1 gap-8">
+      <main className="flex-grow h-screen overflow-hidden"> 
         <TranscriptionEditor
           videoDescriptions={videoDescriptions}
           onDescriptionChange={handleDescriptionChange}
@@ -100,17 +100,6 @@ const App: React.FC = () => {
           setUploadedVideo={setUploadedVideo} // Pass the setter for uploaded video
         />
       </main>
-
-      <footer className="bg-white shadow-md py-4">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center text-gray-500">
-          <button
-            onClick={handleReset}
-            className="bg-red-500 text-white px-6 py-3 rounded-md shadow-md hover:bg-red-600 transition-all"
-          >
-            Reset Application
-          </button>
-        </div>
-      </footer>
     </div>
   );
 };
