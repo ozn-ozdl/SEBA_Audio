@@ -1,33 +1,33 @@
 import React, { useState, useEffect } from "react";
-import VideoUploader from "./components/VideoUploader";
-import VideoDescription from "./components/VideoDescription";
-import { Video, Play, Pause } from "lucide-react";
+import TranscriptionEditor from "./components/TranscriptionEditor";
+import { Video } from "lucide-react";
 import "./App.css";
+
+interface VideoDescriptionItem {
+  startTime: string;
+  endTime: string;
+  description: string;
+  videoUrl: string;
+}
 
 const App: React.FC = () => {
   const synth = window.speechSynthesis;
-  interface VideoDescriptionItem {
-    startTime: string;
-    endTime: string;
-    description: string;
-    videoUrl: string;
-  }
 
-  const [videoDescriptions, setVideoDescriptions] = useState<
-    VideoDescriptionItem[]
-  >([]);
+  // State management
+  const [videoDescriptions, setVideoDescriptions] = useState<VideoDescriptionItem[]>([]);
   const [uploadedVideo, setUploadedVideo] = useState<File | null>(null);
   const [combinedDescriptions, setCombinedDescriptions] = useState("");
   const [speechActive, setSpeechActive] = useState(false);
-  const [speechUtterance, setSpeechUtterance] =
-    useState<SpeechSynthesisUtterance | null>(null);
+  const [speechUtterance, setSpeechUtterance] = useState<SpeechSynthesisUtterance | null>(null);
 
+  // Update combined descriptions when video descriptions change
   useEffect(() => {
     const descriptionsArray = videoDescriptions.map((item) => item.description);
     const combinedText = descriptionsArray.join(" ");
     setCombinedDescriptions(combinedText);
   }, [videoDescriptions]);
 
+  // Video processing function
   const handleProcessVideo = async (videoFile: File, action: string) => {
     if (!action) {
       alert("Please select an action");
@@ -65,73 +65,13 @@ const App: React.FC = () => {
     }
   };
 
-  const handleEncodeVideo = async () => {
-    if (!uploadedVideo || videoDescriptions.length === 0) {
-      alert("Please process a video and ensure descriptions are available.");
-      return;
-    }
-
-    const descriptions = videoDescriptions.map((item) => item.description);
-    const timestamps = videoDescriptions.map((item) => [
-      item.startTime,
-      item.endTime,
-    ]);
-
-    const jsonPayload = {
-      descriptions,
-      timestamps,
-      videoFileName: uploadedVideo.name,
-    };
-
-    try {
-      const encodeResponse = await fetch(
-        "http://localhost:5000/encode-video-with-subtitles",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(jsonPayload),
-        }
-      );
-
-      if (encodeResponse.ok) {
-        const result = await encodeResponse.json();
-        const downloadUrl = `http://localhost:5000${result.output_video_url}`;
-
-        const link = document.createElement("a");
-        link.href = downloadUrl;
-        link.download = result.output_video_url.split("/").pop();
-        link.click();
-      } else {
-        alert("Error encoding video with subtitles");
-      }
-    } catch (error) {
-      alert("Error connecting to backend");
-    }
-  };
-
-  const toggleAudioDescription = () => {
-    if (!speechActive) {
-      const speech = new SpeechSynthesisUtterance(combinedDescriptions);
-      speech.lang = "en-US";
-
-      synth.speak(speech);
-      setSpeechActive(true);
-      setSpeechUtterance(speech);
-    } else {
-      synth.cancel();
-      setSpeechActive(false);
-    }
-  };
-
   const handleDescriptionChange = (
     updatedDescriptions: VideoDescriptionItem[]
   ) => {
     setVideoDescriptions(updatedDescriptions);
   };
 
-  const resetAppState = () => {
+  const handleReset = () => {
     synth.cancel();
     setVideoDescriptions([]);
     setUploadedVideo(null);
@@ -151,52 +91,20 @@ const App: React.FC = () => {
         </div>
       </header>
 
-      <main className="flex-1 w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 grid md:grid-cols-2 gap-8">
-        <div className="md:col-span-1 bg-white rounded-lg shadow-md p-6 ">
-          <h2 className="text-xl font-semibold text-gray-800 mb-4 border-b pb-2">
-            Scene Descriptions
-          </h2>
-          <VideoDescription
-            videoDescriptions={videoDescriptions}
-            onDescriptionChange={handleDescriptionChange}
-          />
-        </div>
-
-        <div className="md:col-span-1">
-          <VideoUploader onProcessVideo={handleProcessVideo} />
-          <div>
-            {videoDescriptions.length > 0 && (
-              <div className="mt-4 flex flex-col items-start gap-2">
-                <button
-                  onClick={handleEncodeVideo}
-                  className="bg-yellow-400 text-indigo-900 px-6 py-3 rounded-md shadow-md hover:bg-yellow-500 transition-all"
-                >
-                  Finalize and Encode Video
-                </button>
-                <button
-                  onClick={toggleAudioDescription}
-                  className="bg-green-400 text-indigo-900 px-6 py-3 rounded-md shadow-md hover:bg-green-500 transition-all flex items-center gap-2"
-                >
-                  {synth.speaking ? (
-                    <>
-                      <Pause size={20} /> Stop Audio
-                    </>
-                  ) : (
-                    <>
-                      <Play size={20} /> Play Audio
-                    </>
-                  )}
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
+      <main className="flex-1 w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 grid md:grid-cols-1 gap-8">
+        <TranscriptionEditor
+          videoDescriptions={videoDescriptions}
+          onDescriptionChange={handleDescriptionChange}
+          uploadedVideo={uploadedVideo}
+          onProcessVideo={handleProcessVideo} // Pass the process video function
+          setUploadedVideo={setUploadedVideo} // Pass the setter for uploaded video
+        />
       </main>
 
       <footer className="bg-white shadow-md py-4">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center text-gray-500">
           <button
-            onClick={resetAppState}
+            onClick={handleReset}
             className="bg-red-500 text-white px-6 py-3 rounded-md shadow-md hover:bg-red-600 transition-all"
           >
             Reset Application
