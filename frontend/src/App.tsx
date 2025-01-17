@@ -14,13 +14,12 @@ const App: React.FC = () => {
   }
 
   const [videoDescriptions, setVideoDescriptions] = useState<
-    VideoDescriptionItem[]
+  VideoDescriptionItem[]
   >([]);
   const [uploadedVideo, setUploadedVideo] = useState<File | null>(null);
   const [combinedDescriptions, setCombinedDescriptions] = useState("");
   const [speechActive, setSpeechActive] = useState(false);
-  const [speechUtterance, setSpeechUtterance] =
-    useState<SpeechSynthesisUtterance | null>(null);
+  const [audio, setAudio] = useState<HTMLAudioElement | null>(null);
 
   useEffect(() => {
     const descriptionsArray = videoDescriptions.map((item) => item.description);
@@ -65,6 +64,46 @@ const App: React.FC = () => {
     }
   };
 
+  const toggleAudioDescription = async () => {
+    if (!speechActive) {
+      try {
+        const response = await fetch("http://localhost:5000/text-to-speech", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ text: combinedDescriptions }),
+        });
+
+        if (response.ok) {
+          const audioBlob = await response.blob();
+          const audioUrl = URL.createObjectURL(audioBlob);
+
+          const newAudio = new Audio(audioUrl);
+          setAudio(newAudio);
+
+          newAudio.play();
+          setSpeechActive(true);
+
+          newAudio.onended = () => {
+            setSpeechActive(false);
+            setAudio(null);
+          };
+        } else {
+          alert("Error generating audio description");
+        }
+      } catch (error) {
+        alert("Error connecting to backend");
+      }
+    } else {
+      if (audio) {
+        audio.pause();
+        audio.currentTime = 0; // Reset audio to the beginning
+      }
+      setSpeechActive(false);
+    }
+  };
+
   const handleEncodeVideo = async () => {
     if (!uploadedVideo || videoDescriptions.length === 0) {
       alert("Please process a video and ensure descriptions are available.");
@@ -73,7 +112,7 @@ const App: React.FC = () => {
 
     const descriptions = videoDescriptions.map((item) => item.description);
     const timestamps = videoDescriptions.map((item) => [
-      item.startTime,
+      item.startTime, 
       item.endTime,
     ]);
 
@@ -111,20 +150,6 @@ const App: React.FC = () => {
     }
   };
 
-  const toggleAudioDescription = () => {
-    if (!speechActive) {
-      const speech = new SpeechSynthesisUtterance(combinedDescriptions);
-      speech.lang = "en-US";
-
-      synth.speak(speech);
-      setSpeechActive(true);
-      setSpeechUtterance(speech);
-    } else {
-      synth.cancel();
-      setSpeechActive(false);
-    }
-  };
-
   const handleDescriptionChange = (
     updatedDescriptions: VideoDescriptionItem[]
   ) => {
@@ -132,12 +157,15 @@ const App: React.FC = () => {
   };
 
   const resetAppState = () => {
-    synth.cancel();
+    if (audio) {
+      audio.pause();
+      audio.currentTime = 0;
+    }
+    setSpeechActive(false);
     setVideoDescriptions([]);
     setUploadedVideo(null);
     setCombinedDescriptions("");
-    setSpeechActive(false);
-    setSpeechUtterance(null);
+    setAudio(null);
   };
 
   return (
@@ -175,9 +203,11 @@ const App: React.FC = () => {
                 </button>
                 <button
                   onClick={toggleAudioDescription}
-                  className="bg-green-400 text-indigo-900 px-6 py-3 rounded-md shadow-md hover:bg-green-500 transition-all flex items-center gap-2"
+                  className={`${
+                    speechActive ? "bg-red-500" : "bg-green-400"
+                  } text-indigo-900 px-6 py-3 rounded-md shadow-md hover:transition-all flex items-center gap-2`}
                 >
-                  {synth.speaking ? (
+                  {speechActive ? (
                     <>
                       <Pause size={20} /> Stop Audio
                     </>
