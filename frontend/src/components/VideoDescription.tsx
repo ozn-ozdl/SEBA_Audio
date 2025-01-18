@@ -1,4 +1,5 @@
-import { produce } from 'immer'
+import { produce } from "immer";
+import React, { useState, useEffect } from "react";
 
 interface VideoDescriptionItem {
   startTime: string;
@@ -9,18 +10,36 @@ interface VideoDescriptionItem {
 
 interface Props {
   videoDescriptions: VideoDescriptionItem[];
-  setVideoDescriptions: React.Dispatch<React.SetStateAction<VideoDescriptionItem[]>>;
+  setVideoDescriptions: React.Dispatch<
+    React.SetStateAction<VideoDescriptionItem[]>
+  >;
+  onDescriptionChange: (updatedDescriptions: VideoDescriptionItem[]) => void;
 }
 
 const VideoDescription: React.FC<Props> = ({
   videoDescriptions,
   setVideoDescriptions,
+  onDescriptionChange,
 }) => {
+  const [editableDescriptions, setEditableDescriptions] = useState<
+    VideoDescriptionItem[]
+  >([]);
+
+  useEffect(() => {
+    setEditableDescriptions(videoDescriptions);
+  }, [videoDescriptions]);
 
   const handleDescriptionChange = (index: number, newDescription: string) => {
-    setVideoDescriptions(produce((draft) => {
-      draft[index].description = newDescription;
-    }));
+    const updatedDescriptions = [...editableDescriptions];
+    updatedDescriptions[index].description = newDescription;
+    setEditableDescriptions(updatedDescriptions);
+
+    onDescriptionChange(updatedDescriptions);
+    setVideoDescriptions(
+      produce((draft) => {
+        draft[index].description = newDescription;
+      })
+    );
   };
 
   return (
