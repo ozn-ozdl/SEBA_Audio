@@ -2,6 +2,7 @@ from openai import OpenAI
 from dotenv import load_dotenv
 import os
 from openai import OpenAI
+from concurrent.futures import ThreadPoolExecutor
 
 load_dotenv()
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
@@ -66,7 +67,7 @@ def describe_scenes_with_openai(scene_changes, frames_dir):
     scene_index = 0
 
     for frame in frames:
-        if (frames[0] == frame):
+        if frames[0] == frame:
             current_scene.append(frame)
             scene_index += 1
             continue
@@ -82,12 +83,13 @@ def describe_scenes_with_openai(scene_changes, frames_dir):
     scene_descriptions = []
 
     for _, frames in enumerate(scene_frames):
-
-        frame_descriptions = []
-        for frame in frames:
-            description = generate_image_description_with_openai(
-                os.path.join(frames_dir, frame))
-            frame_descriptions.append(description)
+        with ThreadPoolExecutor() as executor:
+            frame_descriptions = list(
+                executor.map(
+                    generate_image_description_with_openai,
+                    [os.path.join(frames_dir, frame) for frame in frames]
+                )
+            )
 
         scene_description = summarize_descriptions_with_openai(
             frame_descriptions)
