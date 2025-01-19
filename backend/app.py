@@ -106,7 +106,6 @@ def process_video():
                     detected_scenes)
                 talking_timestamps = sg.format_talking_timestamps(
                     talking_timestamps)
-
                 detected_scenes = sg.combine_speaking_and_scenes(
                     scenes_timestamps, talking_timestamps)
 
