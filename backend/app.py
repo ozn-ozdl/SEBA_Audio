@@ -101,7 +101,7 @@ def process_video():
 
             talking_timestamps = sg.get_talking_timestamps_with_gemini(
                 video_path).strip().splitlines()
-            if (talking_timestamps != "NO_TALKING"):
+            if (talking_timestamps[0] != "NO_TALKING"):
                 scenes_timestamps = sg.scene_list_to_string_list(
                     detected_scenes)
                 talking_timestamps = sg.format_talking_timestamps(

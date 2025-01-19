@@ -1,7 +1,16 @@
 import { useState, useEffect } from "react";
 import VideoUploader from "../../components/VideoUploader";
 import VideoDescription from "../../components/VideoDescription";
-import { Video, Play, Pause, FileOutput, FileAudio2, Save, LayoutDashboard, Power} from "lucide-react";
+import {
+  Video,
+  Play,
+  Pause,
+  FileOutput,
+  FileAudio2,
+  Save,
+  LayoutDashboard,
+  Power,
+} from "lucide-react";
 import { useLocalStorage } from "@uidotdev/usehooks";
 
 export function WorkSpace() {
@@ -24,17 +33,15 @@ export function WorkSpace() {
   const [speechUtterance, setSpeechUtterance] =
     useState<SpeechSynthesisUtterance | null>(null);
   const [videoDescriptionsStorage, setVideoDescriptionsStorage] =
-    useLocalStorage<{ name: string; data: VideoDescriptionItem[] }[]>(
-      `video_descriptions`,
-      []
-    );
+    useLocalStorage<
+      { name: string; data: VideoDescriptionItem[]; date: String }[]
+    >(`video_descriptions`, []);
 
   useEffect(() => {
     const descriptionsArray = videoDescriptions.map((item) => item.description);
     const combinedText = descriptionsArray.join(" ");
     setCombinedDescriptions(combinedText);
     console.log(222);
-
   }, [videoDescriptions]);
 
   useEffect(() => {
@@ -48,8 +55,7 @@ export function WorkSpace() {
       }
     }
     console.log(333);
-
-  }, [videoDescriptionsStorage]);
+  }, [videoDescriptionsStorage, name]);
 
   const handleProcessVideo = async (videoFile: File, action: string) => {
     if (!action) {
@@ -171,8 +177,9 @@ export function WorkSpace() {
 
     const srtPayload = videoDescriptions
       .map((item, index) => {
-        return `${index + 1}\n${item.startTime} --> ${item.endTime}\n${item.description
-          }\n\n`;
+        return `${index + 1}\n${item.startTime} --> ${item.endTime}\n${
+          item.description
+        }\n\n`;
       })
       .join("");
 
@@ -192,7 +199,13 @@ export function WorkSpace() {
     }
 
     if (videoDescriptionsStorage.length === 0) {
-      setVideoDescriptionsStorage([{ data: videoDescriptions, name }]);
+      setVideoDescriptionsStorage([
+        {
+          data: videoDescriptions,
+          name,
+          date: new Date().toLocaleDateString(),
+        },
+      ]);
       return;
     }
 
@@ -202,26 +215,33 @@ export function WorkSpace() {
 
     setVideoDescriptionsStorage([
       ...newStorage,
-      { data: videoDescriptions, name },
+      {
+        data: videoDescriptions,
+        name,
+        date: new Date().toLocaleDateString("de-DE", {
+          day: "2-digit",
+          month: "2-digit",
+          year: "numeric",
+        }),
+      },
     ]);
-      alert("Your work has been successfully saved!")
+    alert("Your work has been successfully saved!");
   };
 
   const handleExportMP3 = async () => {
-  
     try {
       const response = await fetch("http://localhost:5001/text_to_speech", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({text:combinedDescriptions}),
+        body: JSON.stringify({ text: combinedDescriptions }),
       });
-  
+
       if (response.ok) {
         const blob = await response.blob();
         const url = URL.createObjectURL(blob);
-  
+
         // Create a download link and trigger the download
         const link = document.createElement("a");
         link.href = url;
@@ -237,7 +257,6 @@ export function WorkSpace() {
       alert("An error occurred while exporting MP3.");
     }
   };
-  
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-indigo-900 via-purple-700 to-indigo-600 flex flex-col">
@@ -261,6 +280,9 @@ export function WorkSpace() {
           <VideoDescription
             videoDescriptions={videoDescriptions}
             setVideoDescriptions={setVideoDescriptions}
+            onDescriptionChange={(updatedDescriptions) => {
+              setVideoDescriptions(updatedDescriptions);
+            }}
           />
         </div>
 
@@ -296,23 +318,22 @@ export function WorkSpace() {
                     className="bg-green-400 text-indigo-900 px-6 py-3 rounded-md shadow-md hover:bg-green-500 transition-all flex items-center gap-2"
                     onClick={handleExportMP3}
                   >
-                    <FileAudio2 size={20}/> Export MP3 file
+                    <FileAudio2 size={20} /> Export MP3 file
                   </button>
 
                   <button
                     className="bg-green-400 text-indigo-900 px-6 py-3 rounded-md shadow-md hover:bg-green-500 transition-all flex items-center gap-2"
                     onClick={handleExportSRT}
                   >
-                    <FileOutput size={20}/> Export SRT file
+                    <FileOutput size={20} /> Export SRT file
                   </button>
                 </div>
-
 
                 <button
                   className="bg-blue-400 text-indigo-900 px-6 py-3 rounded-md shadow-md hover:bg-blue-500 transition-all flex items-center gap-2"
                   onClick={handleSave}
                 >
-                  <Save size={20}/> Save
+                  <Save size={20} /> Save
                 </button>
               </div>
             )}
@@ -322,20 +343,18 @@ export function WorkSpace() {
 
       <footer className="bg-white shadow-md py-4">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center text-gray-500">
-
           <button
-          className="bg-red-500 text-white px-6 py-3 rounded-md shadow-md hover:bg-red-600 transition-all"
-          onClick={() => (window.location.href = "/dashboard")}
+            className="bg-red-500 text-white px-6 py-3 rounded-md shadow-md hover:bg-red-600 transition-all"
+            onClick={() => (window.location.href = "/dashboard")}
           >
-            <LayoutDashboard size={20}/> Dashboard
+            <LayoutDashboard size={20} /> Dashboard
           </button>
-
 
           <button
             onClick={resetAppState}
             className="bg-red-500 text-white px-6 py-3 rounded-md shadow-md hover:bg-red-600 transition-all"
           >
-            <Power size={20}/> Reset Application
+            <Power size={20} /> Reset Application
           </button>
         </div>
       </footer>
