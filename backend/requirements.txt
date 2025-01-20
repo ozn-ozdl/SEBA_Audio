@@ -8,3 +8,6 @@ scenedetect
 google-cloud-aiplatform
 google-auth
 google-generativeai
+pydub
+matplotlib
+librosa

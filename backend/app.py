@@ -12,6 +12,11 @@ import subprocess
 import tempfile
 from gtts import gTTS
 import os
+import numpy as np
+import wave
+import matplotlib.pyplot as plt
+import librosa
+import librosa.display
 
 app = Flask(__name__)
 app.config['MAX_CONTENT_LENGTH'] = 30 * 1024 * 1024
@@ -22,6 +27,7 @@ FRAMES_FOLDER = "./frames"
 SCENES_FOLDER = "./scenes_results"
 PROCESSED_FOLDER = "./processed"
 AUDIO_FOLDER = "./audio"
+WAVEFORM_FOLDER = "./waveforms"
 
 # Ensure directories exist
 os.makedirs(PROCESSED_FOLDER, exist_ok=True)
@@ -37,6 +43,7 @@ def setup():
     if os.path.exists(SCENES_FOLDER):
         shutil.rmtree(SCENES_FOLDER)
     os.makedirs(SCENES_FOLDER, exist_ok=True)
+    os.makedirs(WAVEFORM_FOLDER, exist_ok=True)
 
 
 @app.route("/")
@@ -51,20 +58,47 @@ def get_scene_files(filename):
     return send_from_directory(SCENES_FOLDER, filename)
 
 
+import traceback
+
 @app.route("/process-video", methods=["POST"])
 def process_video():
+    print("Working")
+    
+    # Print the entire request data
+    print("Request data:")
+    print("Form data:", request.form)
+    print("Files:", request.files)
+
     if "video" not in request.files:
         return jsonify({"error": "No video file provided"}), 400
 
     setup()
-
     video_file = request.files["video"]
     action = request.form.get("action")
 
     video_path = os.path.join(UPLOAD_FOLDER, video_file.filename)
     video_file.save(video_path)
 
+    print("video_path:", video_path)
+    print("action:", action)
+
+
     try:
+        # Extract audio from the video
+        audio_path = os.path.join(tempfile.gettempdir(), "extracted_audio.wav")
+        ffmpeg_command = [
+            "ffmpeg",
+            "-i", video_path,
+            "-q:a", "0",  # Preserve audio quality
+            "-map", "a",  # Extract only the audio stream
+            "-y",         # Overwrite the file if it exists
+            audio_path
+        ]
+        subprocess.run(ffmpeg_command, check=True)
+
+        # Generate waveform
+        waveform_image_path = generate_waveform(audio_path)
+        
         if action == "openAI_image":
             vtf.extract_frames_from_video(video_path, FRAMES_FOLDER, 2)
             scene_changes = dsc.detect_scene_changes(FRAMES_FOLDER, 0.3, 0.4)
@@ -97,6 +131,7 @@ def process_video():
 
         # main pipeline process (gemini_optimized)
         elif action == "gemini_optimized":
+            print("action: gemini_optimized")
             detected_scenes = sg.detect_scenes(video_path)
 
             talking_timestamps = sg.get_talking_timestamps_with_gemini(
@@ -116,12 +151,16 @@ def process_video():
                 "descriptions": scene_descriptions,
                 "timestamps": timestamps,
                 "scene_files": scene_files,
+                "waveform_image": waveform_image_path
             }), 200
 
         else:
             return jsonify({"error": "Invalid action"}), 400
 
     except Exception as e:
+        # Print the full exception traceback
+        print("An error occurred:")
+        print(traceback.format_exc())
         return jsonify({"error": str(e)}), 500
 
 
@@ -207,6 +246,35 @@ def generate_srt_file(descriptions, timestamps):
         srt_content.append(description)
         srt_content.append("")
     return "\n".join(srt_content)
+
+def generate_waveform(audio_path):
+    """
+    Generate a waveform image from the extracted audio file.
+    Returns the path to the waveform image.
+    """
+    waveform_image_path = os.path.join(WAVEFORM_FOLDER,"waveform.png")
+
+    try:
+        # Load the audio file
+        y, sr = librosa.load(audio_path, sr=None)
+
+        # Create a waveform plot
+        plt.figure(figsize=(14, 5))
+        librosa.display.waveshow(y, sr=sr, alpha=0.8)
+        plt.title("Waveform")
+        plt.xlabel("Time (s)")
+        plt.ylabel("Amplitude")
+        plt.tight_layout()
+
+        # Save the waveform image
+        plt.savefig(waveform_image_path)
+        plt.close()
+
+        return waveform_image_path
+
+    except Exception as e:
+        print(f"Error generating waveform: {e}")
+        return None
 
 
 if __name__ == "__main__":

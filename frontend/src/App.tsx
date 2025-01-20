@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import TranscriptionEditor from "./components/TranscriptionEditor";
 import { Video } from "lucide-react";
 import "./App.css";
+import TranscriptionEditor2 from "./components/Editor2";
 
 interface VideoDescriptionItem {
   startTime: string;
@@ -180,9 +181,8 @@ const App: React.FC = () => {
         </div>
       </header> */}
 
-      <main className="flex-grow h-screen overflow-hidden">
-      {/* <main className="flex-1 w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 grid md:grid-cols-2 gap-8"> */}
-        <TranscriptionEditor
+      <main className="flex-grow h-screen overflow-hidden"> 
+        {/* <TranscriptionEditor
           videoDescriptions={videoDescriptions}
           onDescriptionChange={handleDescriptionChange}
           uploadedVideo={uploadedVideo}
@@ -231,6 +231,13 @@ const App: React.FC = () => {
             )}
           </div>
         </div> */}
+        <TranscriptionEditor2
+        videoDescriptions={videoDescriptions}
+        onDescriptionChange={handleDescriptionChange}
+        uploadedVideo={uploadedVideo}
+        onProcessVideo={handleProcessVideo} // Pass the process video function
+        setUploadedVideo={setUploadedVideo} // Pass the setter for uploaded video
+      />
       </main>
     </div>
   );

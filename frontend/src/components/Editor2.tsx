@@ -9,6 +9,8 @@ import {
   Upload,
 } from "lucide-react";
 import TimelineVisualizer from "./Timeline";
+import { AudioVisualizer } from "react-audio-visualize";
+import AudioExtractionVisualizer from "./AudioExtractionVizualizer";
 
 interface VideoDescriptionItem {
   startTime: string;
@@ -25,7 +27,7 @@ interface VideoTimelineProps {
   setUploadedVideo: (file: File | null) => void;
 }
 
-const TranscriptionEditor: React.FC<VideoTimelineProps> = ({
+const TranscriptionEditor2: React.FC<VideoTimelineProps> = ({
   videoDescriptions,
   onDescriptionChange,
   uploadedVideo,
@@ -34,13 +36,12 @@ const TranscriptionEditor: React.FC<VideoTimelineProps> = ({
   const [currentTime, setCurrentTime] = useState<number>(0);
   const [videoDuration, setVideoDuration] = useState<number>(0);
   const [videoFile, setVideoFile] = useState<string | null>(null);
+  const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const animationRef = useRef<number | null>(null);
   const [selectedScene, setSelectedScene] = useState<string | null>(null);
   const [currentSubtitle, setCurrentSubtitle] = useState<string>("");
-  const [audioContext, setAudioContext] = useState<AudioContext | null>(null);
-  const [analyserNode, setAnalyserNode] = useState<AnalyserNode | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   // Update current subtitle based on video time
@@ -59,13 +60,57 @@ const TranscriptionEditor: React.FC<VideoTimelineProps> = ({
     setCurrentSubtitle(currentScene?.description || "");
   }, [currentTime, videoDescriptions]);
 
-  // Update video file when uploadedVideo changes
+  // Update video file and create audio blob when uploadedVideo changes
   useEffect(() => {
     if (uploadedVideo) {
       const url = URL.createObjectURL(uploadedVideo);
       setVideoFile(url);
+      extractAudio(uploadedVideo); // Extract audio from the uploaded video
     }
   }, [uploadedVideo]);
+
+
+
+  const extractAudio = async (videoFile: File) => {
+    // Use type assertion to access webkitAudioContext
+    const audioContext = new (window.AudioContext || (window as any).AudioContext)();
+    const arrayBuffer = await videoFile.arrayBuffer();
+  
+    audioContext.decodeAudioData(arrayBuffer, (audioData) => {
+      // Create a new audio buffer source
+      const source = audioContext.createBufferSource();
+      source.buffer = audioData;
+  
+      // Create a MediaStreamDestination to get the audio stream
+      const destination = audioContext.createMediaStreamDestination();
+      source.connect(destination);
+      source.start(0);
+  
+      // Create a new audio blob from the MediaStream
+      const mediaStream = destination.stream;
+      const recorder = new MediaRecorder(mediaStream);
+      const audioChunks: Blob[] = [];
+  
+      recorder.ondataavailable = (event) => {
+        audioChunks.push(event.data);
+      };
+  
+      recorder.onstop = () => {
+        const audioBlob = new Blob(audioChunks, { type: "audio/wav" });
+        setAudioBlob(audioBlob); // Set the audio blob
+        console.log("Audio blob created:", audioBlob);
+      };
+  
+      recorder.start();
+      source.onended = () => {
+        recorder.stop();
+      };
+    }, (error) => {
+      console.error("Error decoding audio data:", error);
+    });
+  };
+  
+  
 
   // High-precision time update using requestAnimationFrame
   useEffect(() => {
@@ -88,19 +133,6 @@ const TranscriptionEditor: React.FC<VideoTimelineProps> = ({
       }
     };
   }, [isPlaying]);
-
-  useEffect(() => {
-    if (!audioRef.current) return;
-    const context = new AudioContext();
-    const source = context.createMediaElementSource(audioRef.current);
-    const analyser = context.createAnalyser();
-
-    source.connect(analyser);
-    analyser.connect(context.destination);
-
-    setAudioContext(context);
-    setAnalyserNode(analyser);
-  }, [audioRef]);
 
   const handleLoadedMetadata = (): void => {
     if (videoRef.current) {
@@ -163,6 +195,7 @@ const TranscriptionEditor: React.FC<VideoTimelineProps> = ({
           onDescriptionChange(processedDescriptions);
           const url = URL.createObjectURL(file);
           setVideoFile(url);
+          extractAudio(file); // Extract audio from the uploaded video
         } else {
           alert("Error processing video");
         }
@@ -231,8 +264,22 @@ const TranscriptionEditor: React.FC<VideoTimelineProps> = ({
     onDescriptionChange(updatedDescriptions);
   };
 
+  const gridStyle = {
+    display: "grid",
+    gridTemplateColumns: `repeat(10, 1fr)`,
+    gridTemplateRows: `repeat(10, 1fr)`,
+    gap: "0.5rem",
+    height: "100vh",
+  };
+
+  // return(
+  //   <div>
+  //     <AudioExtractionVisualizer />
+  //   </div>
+  // )
+
   return (
-    <div className="max-w-full overflow-hidden bg-gray-50">
+    <div className="max-w-full overflow-hidden bg-gray-50 h-screen">
       {/* Top Toolbar */}
       <div className="flex justify-between items-center p-4 bg-gray-800 text-white shadow-md">
         <div className="flex items-center">
@@ -247,26 +294,12 @@ const TranscriptionEditor: React.FC<VideoTimelineProps> = ({
       </div>
 
       {/* Main Content Area */}
-      <div className="flex h-screen">
+      <div className="grid grid-cols-10 grid-rows-10 h-full">
         {/* Left Sidebar - Transcription */}
-        <div className="w-2/5 p-4 bg-white shadow-md overflow-y-auto">
+        <div className="col-span-5 row-span-7 p-4 bg-white shadow-md overflow-y-auto">
           <div className="mb-4">
             <span className="font-bold text-xl">Transcription</span>
           </div>
-
-          {/* Buttons Section */}
-          <div className="mb-4">
-            <button className="mr-2 p-2 bg-blue-500 text-white rounded hover:bg-blue-600">
-              Download Transcript
-            </button>
-            <button className="mr-2 p-2 bg-gray-300 text-black rounded hover:bg-gray-400">
-              Reset Text
-            </button>
-            <button className="p-2 bg-green-500 text-white rounded hover:bg-green-600">
-              Add Scene
-            </button>
-          </div>
-
           <div>
             {videoDescriptions.map((scene, index) => (
               <div
@@ -293,9 +326,8 @@ const TranscriptionEditor: React.FC<VideoTimelineProps> = ({
           </div>
         </div>
 
-        {/* Preview and Timeline Area */}
-        <div className="w-3/5 p-4 bg-white flex flex-col shadow-md">
-          {/* Video Preview */}
+        {/* Video Preview Area */}
+        <div className="col-span-5 row-span-7 flex flex-col p-4 bg-white shadow-md">
           <div className="flex-grow mb-4 relative">
             {videoFile ? (
               <>
@@ -332,11 +364,11 @@ const TranscriptionEditor: React.FC<VideoTimelineProps> = ({
             )}
           </div>
 
-          {/* Timeline Controls and Visualizer */}
-          <div className="mb-4">
-            <div className="flex items-center mb-2">
+          {/* Play/Pause Button Row */}
+          <div className="flex items-center mb-2 col-span-6">
+            <div>
               <button
-                className="mr-2 p-2 bg-gray-200 rounded hover:bg-gray-300"
+                className="mr-2 p-2 bg-gray-200 rounded hover:bg-gray-300 w-full"
                 onClick={togglePlayPause}
               >
                 {isPlaying ? (
@@ -345,24 +377,40 @@ const TranscriptionEditor: React.FC<VideoTimelineProps> = ({
                   <Play className="text-black" />
                 )}
               </button>
-              <button className="mr-2 p-2 bg-gray-200 rounded hover:bg-gray-300">
-                <SkipBack className="text-black" />
-              </button>
-              <div className="flex items-center">
-                <Clock className="mr-1" />
-                <span>
-                  {currentTime.toFixed(3)}s / {videoDuration.toFixed(3)}s
-                </span>
-              </div>
             </div>
-
-            {/* Timeline Visualizer */}
+            <div className="flex items-center">
+              <Clock className="mr-1" />
+              <span>
+                {currentTime.toFixed(3)}s / {videoDuration.toFixed(3)}s
+              </span>
+            </div>
+          </div>
+        </div>
+        <div>
+          {audioBlob && (
+            <AudioVisualizer
+              blob={audioBlob} // Use the audio blob here
+              width={500}
+              height={75}
+            />
+          )}  
+        </div>
+        {/* Timeline Visualizer with AudioVisualizer */}
+        <div className="col-span-10 row-span-2 p-4 bg-white shadow-md">
+          {audioBlob && (
             <TimelineVisualizer
               videoDescriptions={videoDescriptions}
               currentTime={currentTime}
               onDescriptionChange={onDescriptionChange}
+              visualizer={
+                <AudioVisualizer
+                  blob={audioBlob} // Use the audio blob here
+                  width={500}
+                  height={75}
+                />
+              }
             />
-          </div>
+          )}
         </div>
       </div>
     </div>
@@ -378,4 +426,4 @@ const convertTimestampToSeconds = (timestamp: string): number => {
   return hours * 3600 + minutes * 60 + seconds;
 };
 
-export default TranscriptionEditor;
+export default TranscriptionEditor2;
