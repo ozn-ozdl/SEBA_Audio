@@ -1,5 +1,5 @@
 import os
-from flask import Flask, request, jsonify, send_from_directory
+from flask import Flask, request, jsonify, send_from_directory, send_file
 from flask_cors import CORS
 import shutil
 import openAI_images.video_to_frames as vtf
@@ -10,6 +10,8 @@ from openAI_images.vidToDesGemini import describe_with_gemini_whole_video, get_v
 import openAI_images.scenes_to_description_optimized_gemini as sg
 import subprocess
 import tempfile
+from gtts import gTTS
+import os
 
 app = Flask(__name__)
 app.config['MAX_CONTENT_LENGTH'] = 30 * 1024 * 1024
@@ -19,9 +21,11 @@ UPLOAD_FOLDER = "./uploads"
 FRAMES_FOLDER = "./frames"
 SCENES_FOLDER = "./scenes_results"
 PROCESSED_FOLDER = "./processed"
+AUDIO_FOLDER = "./audio"
 
 # Ensure directories exist
 os.makedirs(PROCESSED_FOLDER, exist_ok=True)
+os.makedirs(AUDIO_FOLDER, exist_ok=True)
 
 
 def setup():
@@ -97,12 +101,11 @@ def process_video():
 
             talking_timestamps = sg.get_talking_timestamps_with_gemini(
                 video_path).strip().splitlines()
-            if (talking_timestamps != "NO_TALKING"):
+            if (talking_timestamps[0] != "NO_TALKING"):
                 scenes_timestamps = sg.scene_list_to_string_list(
                     detected_scenes)
                 talking_timestamps = sg.format_talking_timestamps(
                     talking_timestamps)
-
                 detected_scenes = sg.combine_speaking_and_scenes(
                     scenes_timestamps, talking_timestamps)
 
@@ -175,6 +178,24 @@ def get_processed_video(filename):
         return send_from_directory(PROCESSED_FOLDER, filename, as_attachment=True)
     except FileNotFoundError:
         return jsonify({"error": "File not found"}), 404
+
+
+@app.route("/text-to-speech", methods=["POST"])
+def text_to_speech():
+    data = request.get_json()
+    if not data or "text" not in data:
+        return jsonify({"error": "Invalid input. 'text' is required."}), 400
+
+    text = data["text"]
+
+    try:
+        tts = gTTS(text=text, lang="en")
+        audio_file_path = os.path.join(AUDIO_FOLDER, "output.mp3")
+        tts.save(audio_file_path)
+
+        return send_file(audio_file_path, mimetype="audio/mpeg", as_attachment=False)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 def generate_srt_file(descriptions, timestamps):

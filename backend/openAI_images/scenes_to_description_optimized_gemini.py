@@ -46,7 +46,6 @@ def generate_video_description_with_gemini(video_file_path):
 
 
 def describe_scenes_with_gemini_video(video_file, timestamps, output_dir):
-
     output_files = []
     tuple_timestamps = []
     for idx, (start, end) in enumerate(timestamps):
@@ -124,7 +123,6 @@ def format_talking_timestamps(talking_timestamps):
 
 
 def combine_speaking_and_scenes(scenes, talkings):
-
     scenes_int = time_interval_to_seconds(scenes)
     talkings_int = time_interval_to_seconds(talkings)
 
