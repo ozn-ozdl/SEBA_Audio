@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from "react";
-import TranscriptionEditor from "./components/TranscriptionEditor";
-import { Video } from "lucide-react";
-import "./App.css";
-import TranscriptionEditor2 from "./components/Editor2";
+import TranscriptionEditor from "src/components/TranscriptionEditor";
+import { Video, Play, Pause, Save } from "lucide-react";
+// import "./App.css";
+import TranscriptionEditor2 from "src/components/Editor2";
+import { useLocalStorage } from "@uidotdev/usehooks";
 
 interface VideoDescriptionItem {
   startTime: string;
@@ -11,15 +12,22 @@ interface VideoDescriptionItem {
   videoUrl: string;
 }
 
-const App: React.FC = () => {
+const Workspace2: React.FC = () => {
   const synth = window.speechSynthesis;
+  const name = new URLSearchParams(window.location.search).get("name")!;
 
   // State management
-  const [videoDescriptions, setVideoDescriptions] = useState<VideoDescriptionItem[]>([]);
+  const [videoDescriptions, setVideoDescriptions] = useState<
+    VideoDescriptionItem[]
+  >([]);
   const [uploadedVideo, setUploadedVideo] = useState<File | null>(null);
   const [combinedDescriptions, setCombinedDescriptions] = useState("");
   const [speechActive, setSpeechActive] = useState(false);
   const [audio, setAudio] = useState<HTMLAudioElement | null>(null);
+  const [videoDescriptionsStorage, setVideoDescriptionsStorage] =
+    useLocalStorage<
+      { name: string; data: VideoDescriptionItem[]; date: string }[]
+    >(`video_descriptions`, []);
 
   // Update combined descriptions when video descriptions change
   useEffect(() => {
@@ -27,6 +35,19 @@ const App: React.FC = () => {
     const combinedText = descriptionsArray.join(" ");
     setCombinedDescriptions(combinedText);
   }, [videoDescriptions]);
+
+  // Load video descriptions from local storage
+  useEffect(() => {
+    if (videoDescriptionsStorage) {
+      const currentDetail = videoDescriptionsStorage.find(
+        (item) => item.name === name
+      );
+
+      if (currentDetail) {
+        setVideoDescriptions(currentDetail.data);
+      }
+    }
+  }, [videoDescriptionsStorage, name]);
 
   // Video processing function
   const handleProcessVideo = async (videoFile: File, action: string) => {
@@ -152,10 +173,40 @@ const App: React.FC = () => {
     }
   };
 
-  const handleDescriptionChange = (
-    updatedDescriptions: VideoDescriptionItem[]
-  ) => {
-    setVideoDescriptions(updatedDescriptions);
+  const handleSave = async () => {
+    if (videoDescriptions.length === 0) {
+      alert("Please process a video and ensure descriptions are available.");
+      return;
+    }
+
+    if (videoDescriptionsStorage.length === 0) {
+      setVideoDescriptionsStorage([
+        {
+          data: videoDescriptions,
+          name,
+          date: new Date().toLocaleDateString(),
+        },
+      ]);
+      return;
+    }
+
+    const newStorage = videoDescriptionsStorage.filter(
+      (item) => item.name !== name
+    );
+
+    setVideoDescriptionsStorage([
+      ...newStorage,
+      {
+        data: videoDescriptions,
+        name,
+        date: new Date().toLocaleDateString("de-DE", {
+          day: "2-digit",
+          month: "2-digit",
+          year: "numeric",
+        }),
+      },
+    ]);
+    alert("Your work has been successfully saved!");
   };
 
   const resetAppState = () => {
@@ -172,77 +223,49 @@ const App: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-indigo-900 via-purple-700 to-indigo-600 flex flex-col">
-      {/* <header className="bg-white shadow-md">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
-          <h1 className="text-2xl font-bold text-black flex items-center">
-            <Video className="mr-3 text-yellow-400" />
-            Video Description Generator
-          </h1>
-        </div>
-      </header> */}
-
-      <main className="flex-grow h-screen overflow-hidden"> 
-        {/* <TranscriptionEditor
-          videoDescriptions={videoDescriptions}
-          onDescriptionChange={handleDescriptionChange}
-          uploadedVideo={uploadedVideo}
-          onProcessVideo={handleProcessVideo} // Pass the process video function
-          setUploadedVideo={setUploadedVideo} // Pass the setter for uploaded video
-        />
-        {/* <div className="md:col-span-1 bg-white rounded-lg shadow-md p-6 ">
-          <h2 className="text-xl font-semibold text-gray-800 mb-4 border-b pb-2">
-            Scene Descriptions
-          </h2>
-          <VideoDescription
-            videoDescriptions={videoDescriptions}
-            onDescriptionChange={handleDescriptionChange}
-            setVideoDescriptions={setVideoDescriptions}
-          />
-        </div>
-
-        <div className="md:col-span-1">
-          <VideoUploader onProcessVideo={handleProcessVideo} />
-          <div>
-            {videoDescriptions.length > 0 && (
-              <div className="mt-4 flex flex-col items-start gap-2">
-                <button
-                  onClick={handleEncodeVideo}
-                  className="bg-yellow-400 text-indigo-900 px-6 py-3 rounded-md shadow-md hover:bg-yellow-500 transition-all"
-                >
-                  Finalize and Encode Video
-                </button>
-                <button
-                  onClick={toggleAudioDescription}
-                  className={`${
-                    speechActive ? "bg-red-500" : "bg-green-400"
-                  } text-indigo-900 px-6 py-3 rounded-md shadow-md hover:transition-all flex items-center gap-2`}
-                >
-                  {speechActive ? (
-                    <>
-                      <Pause size={20} /> Stop Audio
-                    </>
-                  ) : (
-                    <>
-                      <Play size={20} /> Play Audio
-                    </>
-                  )}
-                </button>
-              </div>
-            )}
-          </div>
-        </div> */}
+      <main className="flex-grow h-screen overflow-hidden">
         <TranscriptionEditor2
-        videoDescriptions={videoDescriptions}
-        onDescriptionChange={handleDescriptionChange}
-        uploadedVideo={uploadedVideo}
-        onProcessVideo={handleProcessVideo} // Pass the process video function
-        setUploadedVideo={setUploadedVideo} // Pass the setter for uploaded video
-        handleEncodeVideo={handleEncodeVideo}
-        toggleAudioDescription={toggleAudioDescription}
-      />
+          videoDescriptions={videoDescriptions}
+          onDescriptionChange={setVideoDescriptions}
+          uploadedVideo={uploadedVideo}
+          onProcessVideo={handleProcessVideo}
+          setUploadedVideo={setUploadedVideo}
+          handleEncodeVideo={handleEncodeVideo}
+          toggleAudioDescription={toggleAudioDescription}
+        />
+        <div className="mt-4 flex flex-col items-start gap-2">
+          <button
+            onClick={handleSave}
+            className="bg-yellow-400 text-indigo-900 px-6 py-3 rounded-md shadow-md hover:bg-yellow-500 transition-all"
+          >
+            <Save size={20} /> Save Descriptions
+          </button>
+          <button
+            onClick={toggleAudioDescription}
+            className={`${
+              speechActive ? "bg-red-500" : "bg-green-400"
+            } text-indigo-900 px-6 py-3 rounded-md shadow-md hover:transition-all flex items-center gap-2`}
+          >
+            {speechActive ? (
+              <>
+                <Pause size={20} /> Stop Audio
+              </>
+            ) : (
+              <>
+                <Play size={20} /> Play Audio
+              </>
+            )}
+          </button>
+          {/* <button
+            onClick={resetAppState}
+            className="bg-red-500 text-white px-6 py-3 rounded-md shadow-md hover:bg-red-600 transition-all"
+          >
+            Reset
+          </button> */}
+        </div>
       </main>
     </div>
   );
 };
 
-export default App;
+export default Workspace2;

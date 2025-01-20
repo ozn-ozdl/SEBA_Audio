@@ -11,3 +11,4 @@ google-generativeai
 pydub
 matplotlib
 librosa
+gtts

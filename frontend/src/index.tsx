@@ -6,6 +6,8 @@ import { Dashboard } from "./pages/dashboard/index";
 import LandingPage from "./pages/landingPage";
 import { WorkSpace } from "./pages/workspace/index";
 import reportWebVitals from "./reportWebVitals";
+
+import Workspace2 from "./pages/workspace/index2";
 import App from "./App";
 
 const root = ReactDOM.createRoot(
@@ -16,7 +18,7 @@ root.render(
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<LandingPage />} />
-        <Route path="workspace" element={<WorkSpace />} />
+        <Route path="workspace" element={<Workspace2 />} />
         <Route path="dashboard" element={<Dashboard />} />
         <Route path="main" element={<App />} />
       </Routes>

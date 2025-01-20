@@ -25,6 +25,8 @@ interface VideoTimelineProps {
   uploadedVideo: File | null;
   onProcessVideo: (videoFile: File, action: string) => Promise<void>;
   setUploadedVideo: (file: File | null) => void;
+  handleEncodeVideo: () => void;
+  toggleAudioDescription: () => void;
 }
 
 const TranscriptionEditor2: React.FC<VideoTimelineProps> = ({
@@ -65,52 +67,53 @@ const TranscriptionEditor2: React.FC<VideoTimelineProps> = ({
     if (uploadedVideo) {
       const url = URL.createObjectURL(uploadedVideo);
       setVideoFile(url);
-      extractAudio(uploadedVideo); // Extract audio from the uploaded video
+      // extractAudio(uploadedVideo); // Extract audio from the uploaded video
     }
   }, [uploadedVideo]);
 
-
-
   const extractAudio = async (videoFile: File) => {
     // Use type assertion to access webkitAudioContext
-    const audioContext = new (window.AudioContext || (window as any).AudioContext)();
+    const audioContext = new (window.AudioContext ||
+      (window as any).AudioContext)();
     const arrayBuffer = await videoFile.arrayBuffer();
-  
-    audioContext.decodeAudioData(arrayBuffer, (audioData) => {
-      // Create a new audio buffer source
-      const source = audioContext.createBufferSource();
-      source.buffer = audioData;
-  
-      // Create a MediaStreamDestination to get the audio stream
-      const destination = audioContext.createMediaStreamDestination();
-      source.connect(destination);
-      source.start(0);
-  
-      // Create a new audio blob from the MediaStream
-      const mediaStream = destination.stream;
-      const recorder = new MediaRecorder(mediaStream);
-      const audioChunks: Blob[] = [];
-  
-      recorder.ondataavailable = (event) => {
-        audioChunks.push(event.data);
-      };
-  
-      recorder.onstop = () => {
-        const audioBlob = new Blob(audioChunks, { type: "audio/wav" });
-        setAudioBlob(audioBlob); // Set the audio blob
-        console.log("Audio blob created:", audioBlob);
-      };
-  
-      recorder.start();
-      source.onended = () => {
-        recorder.stop();
-      };
-    }, (error) => {
-      console.error("Error decoding audio data:", error);
-    });
+
+    audioContext.decodeAudioData(
+      arrayBuffer,
+      (audioData) => {
+        // Create a new audio buffer source
+        const source = audioContext.createBufferSource();
+        source.buffer = audioData;
+
+        // Create a MediaStreamDestination to get the audio stream
+        const destination = audioContext.createMediaStreamDestination();
+        source.connect(destination);
+        source.start(0);
+
+        // Create a new audio blob from the MediaStream
+        const mediaStream = destination.stream;
+        const recorder = new MediaRecorder(mediaStream);
+        const audioChunks: Blob[] = [];
+
+        recorder.ondataavailable = (event) => {
+          audioChunks.push(event.data);
+        };
+
+        recorder.onstop = () => {
+          const audioBlob = new Blob(audioChunks, { type: "audio/wav" });
+          setAudioBlob(audioBlob); // Set the audio blob
+          console.log("Audio blob created:", audioBlob);
+        };
+
+        recorder.start();
+        source.onended = () => {
+          recorder.stop();
+        };
+      },
+      (error) => {
+        console.error("Error decoding audio data:", error);
+      }
+    );
   };
-  
-  
 
   // High-precision time update using requestAnimationFrame
   useEffect(() => {
@@ -204,6 +207,52 @@ const TranscriptionEditor2: React.FC<VideoTimelineProps> = ({
       } finally {
         setIsProcessing(false);
       }
+    }
+  };
+
+  const handleEncodeVideo = async () => {
+    if (!uploadedVideo || videoDescriptions.length === 0) {
+      alert("Please process a video and ensure descriptions are available.");
+      return;
+    }
+
+    const descriptions = videoDescriptions.map((item) => item.description);
+    const timestamps = videoDescriptions.map((item) => [
+      item.startTime,
+      item.endTime,
+    ]);
+
+    const jsonPayload = {
+      descriptions,
+      timestamps,
+      videoFileName: uploadedVideo.name,
+    };
+
+    try {
+      const encodeResponse = await fetch(
+        "http://localhost:5000/encode-video-with-subtitles",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(jsonPayload),
+        }
+      );
+
+      if (encodeResponse.ok) {
+        const result = await encodeResponse.json();
+        const downloadUrl = `http://localhost:5000${result.output_video_url}`;
+
+        const link = document.createElement("a");
+        link.href = downloadUrl;
+        link.download = result.output_video_url.split("/").pop();
+        link.click();
+      } else {
+        alert("Error encoding video with subtitles");
+      }
+    } catch (error) {
+      alert("Error connecting to backend");
     }
   };
 
@@ -306,10 +355,10 @@ const TranscriptionEditor2: React.FC<VideoTimelineProps> = ({
                 key={scene.startTime}
                 className={`p-2 mb-2 rounded-lg border ${
                   selectedScene === scene.startTime
-                    ? "bg-blue-500 text-white"
-                    : "hover:bg-gray-200"
+                    ? "bg-blue-500 text-black" // Selected state
+                    : "hover:bg-gray-200" // Default hover state
                 }`}
-                onClick={() => setSelectedScene(scene.startTime)}
+                onClick={() => setSelectedScene(scene.startTime)} // Set selected scene on click
               >
                 <div>
                   {`Scene ${index + 1}: ${scene.startTime} - ${scene.endTime}`}
@@ -384,33 +433,18 @@ const TranscriptionEditor2: React.FC<VideoTimelineProps> = ({
                 {currentTime.toFixed(3)}s / {videoDuration.toFixed(3)}s
               </span>
             </div>
+            <button className="mr-2 p-2 bg-gray-200 rounded hover:bg-gray-300" onClick={handleEncodeVideo}>Encode Video</button>
           </div>
         </div>
-        <div>
-          {audioBlob && (
-            <AudioVisualizer
-              blob={audioBlob} // Use the audio blob here
-              width={500}
-              height={75}
-            />
-          )}  
-        </div>
+
         {/* Timeline Visualizer with AudioVisualizer */}
         <div className="col-span-10 row-span-2 p-4 bg-white shadow-md">
-          {audioBlob && (
-            <TimelineVisualizer
-              videoDescriptions={videoDescriptions}
-              currentTime={currentTime}
-              onDescriptionChange={onDescriptionChange}
-              visualizer={
-                <AudioVisualizer
-                  blob={audioBlob} // Use the audio blob here
-                  width={500}
-                  height={75}
-                />
-              }
-            />
-          )}
+          <TimelineVisualizer
+            videoDescriptions={videoDescriptions}
+            currentTime={currentTime}
+            onDescriptionChange={onDescriptionChange}
+            visualizer={<div></div>}
+          />
         </div>
       </div>
     </div>
