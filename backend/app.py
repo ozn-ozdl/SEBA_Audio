@@ -154,6 +154,65 @@ def process_video():
                 "waveform_image": waveform_image_path
             }), 200
 
+        elif action == "mock":
+            print("action: gemini_optimized")
+
+            # Mocking scene detection and talking timestamps functionality
+            detected_scenes = [
+                {"start": "00:00:00", "end": "00:00:04"},
+                {"start": "00:00:04", "end": "00:00:16"},
+                {"start": "00:00:16", "end": "00:00:20"},
+                {"start": "00:00:20", "end": "00:00:27"},
+                {"start": "00:00:27", "end": "00:00:30"}
+            ]
+
+            talking_timestamps = ["NO_TALKING"]  # Mock response
+
+            if talking_timestamps[0] != "NO_TALKING":
+                scenes_timestamps = [
+                    f"{scene['start']} - {scene['end']}" for scene in detected_scenes
+                ]
+
+                talking_timestamps = [
+                    "00:00:10 - 00:00:12",
+                    "00:00:18 - 00:00:19"
+                ]  # Mock formatted timestamps
+
+                detected_scenes = [
+                    {
+                        "start": scene.split(' - ')[0],
+                        "end": scene.split(' - ')[1]
+                    } for scene in scenes_timestamps
+                ]
+
+            # Mocking Gemini's scene description and other outputs
+            response_data = {
+                "message": "Scene changes detected successfully",
+                "descriptions": [
+                    "A blue \"Big Buck Bunny\" logo with a white butterfly flies across.\n",
+                    "A pink-hued sky overlooks a tranquil green meadow and forest.\n",
+                    "A serene stream flows through a vibrant, lush meadow.\n",
+                    "A fluffy cartoon bird wakes up, yawns, and flies away.\n",
+                    "A whimsical forest scene shows a cozy burrow beneath a tree.\n"
+                ],
+                "timestamps": [
+                    ["00:00:00", "00:00:04"],
+                    ["00:00:04", "00:00:16"],
+                    ["00:00:16", "00:00:20"],
+                    ["00:00:20", "00:00:27"],
+                    ["00:00:27", "00:00:30"]
+                ],
+                "scene_files": [
+                    "scene_1.mp4",
+                    "scene_2.mp4",
+                    "scene_3.mp4",
+                    "scene_4.mp4",
+                    "scene_5.mp4"
+                ],
+                "waveform_image": "./waveforms/waveform.png"
+            }
+
+            return jsonify(response_data), 200
         else:
             return jsonify({"error": "Invalid action"}), 400
 

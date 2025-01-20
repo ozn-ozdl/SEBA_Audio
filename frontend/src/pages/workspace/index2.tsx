@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from "react";
-import TranscriptionEditor from "src/components/TranscriptionEditor";
 import { Video, Play, Pause, Save } from "lucide-react";
 // import "./App.css";
 import TranscriptionEditor2 from "src/components/Editor2";
@@ -256,12 +255,6 @@ const Workspace2: React.FC = () => {
               </>
             )}
           </button>
-          {/* <button
-            onClick={resetAppState}
-            className="bg-red-500 text-white px-6 py-3 rounded-md shadow-md hover:bg-red-600 transition-all"
-          >
-            Reset
-          </button> */}
         </div>
       </main>
     </div>

@@ -5,7 +5,8 @@ interface TimelineVisualizerProps {
   videoDescriptions: VideoDescriptionItem[];
   currentTime: number;
   onDescriptionChange: (updatedDescriptions: VideoDescriptionItem[]) => void;
-  visualizer?: React.ReactNode; // New prop for the visualizer
+  onTimeUpdate?: (time: number) => void; // Optional callback for time updates
+  visualizer?: React.ReactNode;
 }
 
 interface VideoDescriptionItem {
@@ -22,49 +23,103 @@ interface TimelineElement {
   width: number;
   startTime: string;
   endTime: string;
+  color: string;
+}
+
+interface ContainerElement {
+  id: number;
+  startPosition: number;
+  width: number;
+  element: TimelineElement;
 }
 
 const TimelineVisualizer: React.FC<TimelineVisualizerProps> = ({
   videoDescriptions,
   currentTime,
   onDescriptionChange,
+  onTimeUpdate,
   visualizer,
 }) => {
   const [elements, setElements] = useState<TimelineElement[]>([]);
+  const [containers, setContainers] = useState<ContainerElement[]>([]);
   const timelineRef = useRef<HTMLDivElement | null>(null);
   const [timelineWidth, setTimelineWidth] = useState<number>(0);
+  const [isDragging, setIsDragging] = useState(false);
+  const resizingRef = useRef(false);
 
-  // Millisecond-based time-to-pixels conversion (100 pixels = 1 second)
+  const getRandomColor = () => {
+    const colors = [
+      "bg-blue-800",
+      "bg-green-800",
+      "bg-purple-800",
+      "bg-pink-800",
+      "bg-yellow-800",
+    ];
+    return colors[Math.floor(Math.random() * colors.length)];
+  };
+
   const timeToPixels = (timeStr: string): number => {
     const [hours = "0", minutes = "0", seconds = "0"] = timeStr.split(":");
     const totalSeconds =
-      parseInt(hours) * 3600 + parseInt(minutes) * 60 + parseFloat(seconds); // Millisecond precision
-    return totalSeconds * 100; // 100 pixels per second
+      parseInt(hours) * 3600 + parseInt(minutes) * 60 + parseFloat(seconds);
+    return totalSeconds * 100;
   };
 
-  // Millisecond-based pixels-to-time conversion
   const pixelsToTime = (pixels: number): string => {
     const totalSeconds = pixels / 100;
     const hours = Math.floor(totalSeconds / 3600);
     const minutes = Math.floor((totalSeconds % 3600) / 60);
-    const seconds = (totalSeconds % 60).toFixed(3); // Millisecond precision
+    const seconds = (totalSeconds % 60).toFixed(3);
     return `${hours}:${minutes.toString().padStart(2, "0")}:${seconds.padStart(
       6,
       "0"
     )}`;
   };
 
+  const updateContainers = (updatedElements: TimelineElement[]) => {
+    const sortedElements = [...updatedElements].sort(
+      (a, b) => a.position - b.position
+    );
+
+    const newContainers = sortedElements.map((element, index) => {
+      const containerStart =
+        index === 0
+          ? 0
+          : sortedElements[index - 1].position +
+            sortedElements[index - 1].width;
+
+      const containerWidth =
+        index === sortedElements.length - 1
+          ? timelineWidth - containerStart
+          : sortedElements[index + 1].position - containerStart;
+
+      return {
+        id: element.id,
+        startPosition: containerStart,
+        width: containerWidth,
+        element: element,
+      };
+    });
+
+    setContainers(newContainers);
+  };
+
+  const handleWheel = (e: React.WheelEvent<HTMLDivElement>) => {
+    if (timelineRef.current) {
+      e.preventDefault();
+      timelineRef.current.scrollLeft += e.deltaY;
+    }
+  };
+
   useEffect(() => {
-    const newElements = videoDescriptions.map((desc, index) => ({
-      id: index + 1,
-      text: desc.description,
-      position: timeToPixels(desc.startTime),
-      width: timeToPixels(desc.endTime) - timeToPixels(desc.startTime),
-      startTime: desc.startTime,
-      endTime: desc.endTime,
-    }));
-    setElements(newElements);
-  }, [videoDescriptions]);
+    if (timelineRef.current) {
+      const scrollPosition = currentTime * 100;
+      timelineRef.current.scrollTo({
+        left: scrollPosition,
+        behavior: "smooth",
+      });
+    }
+  }, [currentTime]);
 
   useEffect(() => {
     if (videoDescriptions.length > 0) {
@@ -78,31 +133,41 @@ const TimelineVisualizer: React.FC<TimelineVisualizerProps> = ({
   }, [videoDescriptions]);
 
   useEffect(() => {
-    if (timelineRef.current) {
-      const scrollPosition = currentTime * 100; // 100 pixels per second
-      timelineRef.current.scrollTo({
-        left: scrollPosition,
-        behavior: "smooth",
-      });
-    }
-  }, [currentTime]);
+    const newElements = videoDescriptions.map((desc, index) => ({
+      id: index + 1,
+      text: desc.description,
+      position: timeToPixels(desc.startTime),
+      width: timeToPixels(desc.endTime) - timeToPixels(desc.startTime),
+      startTime: desc.startTime,
+      endTime: desc.endTime,
+      color: getRandomColor(),
+    }));
 
-  const handleDragStop = (id: number, position: number) => {
+    setElements(newElements);
+    updateContainers(newElements);
+  }, [videoDescriptions, timelineWidth]);
+
+  const handleDragStop = (elementId: number, newPosition: number) => {
+    if (resizingRef.current) return;
+    setIsDragging(false);
+
     const newElements = elements.map((el) => {
-      if (el.id === id) {
-        const newStartTime = pixelsToTime(position);
-        const endPosition = position + el.width;
+      if (el.id === elementId) {
+        const newStartTime = pixelsToTime(newPosition);
+        const endPosition = newPosition + el.width;
         const newEndTime = pixelsToTime(endPosition);
         return {
           ...el,
-          position,
+          position: newPosition,
           startTime: newStartTime,
           endTime: newEndTime,
         };
       }
       return el;
     });
+
     setElements(newElements);
+    updateContainers(newElements);
 
     const updatedDescriptions = newElements.map((el) => ({
       startTime: el.startTime,
@@ -110,34 +175,40 @@ const TimelineVisualizer: React.FC<TimelineVisualizerProps> = ({
       description: el.text,
       videoUrl: videoDescriptions[el.id - 1].videoUrl,
     }));
+
     onDescriptionChange(updatedDescriptions);
   };
 
-  // const handleResize = (id: number, delta: number) => {
-  //   setElements((prevElements) =>
-  //     prevElements.map((el) => {
-  //       if (el.id === id) {
-  //         const newWidth = Math.max(50, el.width + delta);
-  //         const newEndTime = pixelsToTime(el.position + newWidth);
-  //         return { ...el, width: newWidth, endTime: newEndTime };
-  //       }
-  //       return el;
-  //     })
-  //   );
-  // };
+  const handleResize = (elementId: number, delta: number) => {
+    if (isDragging) return;
 
-  const handleResize = (id: number, delta: number) => {
     setElements((prevElements) => {
+      const currentElement = prevElements.find((e) => e.id === elementId);
+      if (!currentElement) return prevElements;
+
+      const nextElement = [...prevElements]
+        .sort((a, b) => a.position - b.position)
+        .find((e) => e.position > currentElement.position);
+
+      const maxWidth = nextElement
+        ? nextElement.position - currentElement.position
+        : timelineWidth - currentElement.position;
+
+      const newWidth = Math.min(
+        Math.max(50, currentElement.width + delta),
+        maxWidth
+      );
+
       const newElements = prevElements.map((el) => {
-        if (el.id === id) {
-          const newWidth = Math.max(50, el.width + delta);
+        if (el.id === elementId) {
           const newEndTime = pixelsToTime(el.position + newWidth);
           return { ...el, width: newWidth, endTime: newEndTime };
         }
         return el;
       });
 
-      // Update the descriptions based on the new elements
+      updateContainers(newElements);
+
       const updatedDescriptions = newElements.map((el) => ({
         startTime: el.startTime,
         endTime: el.endTime,
@@ -145,18 +216,25 @@ const TimelineVisualizer: React.FC<TimelineVisualizerProps> = ({
         videoUrl: videoDescriptions[el.id - 1].videoUrl,
       }));
 
-      // Call the onDescriptionChange with the updated descriptions
       onDescriptionChange(updatedDescriptions);
 
-      return newElements; // Return the new elements for state update
+      return newElements;
     });
   };
 
-  const handleWheel = (e: React.WheelEvent<HTMLDivElement>) => {
-    if (timelineRef.current) {
-      e.preventDefault(); // Prevent page scrolling
-      timelineRef.current.scrollLeft += e.deltaY; // Scroll horizontally
-    }
+  const handleTimelineClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!timelineRef.current || !onTimeUpdate) return;
+
+    // Get click coordinates relative to the timeline
+    const rect = timelineRef.current.getBoundingClientRect();
+    const scrollLeft = timelineRef.current.scrollLeft;
+    const x = e.clientX - rect.left + scrollLeft;
+
+    // Convert to seconds (assumes 100px per second as per your existing scale)
+    const newTime = x / 100;
+
+    // Trigger the time update
+    onTimeUpdate(newTime);
   };
 
   return (
@@ -167,6 +245,10 @@ const TimelineVisualizer: React.FC<TimelineVisualizerProps> = ({
       style={{ cursor: "grab", width: "100%" }}
     >
       <div className="relative h-full" style={{ width: `${timelineWidth}px` }}>
+        {/* Clickable background layer */}
+        <div className="absolute inset-0" onClick={handleTimelineClick} />
+
+        {/* Time markers */}
         <div className="absolute top-0 left-0 w-full h-full pointer-events-none">
           {Array.from({ length: Math.ceil(timelineWidth / 100) }).map(
             (_, index) => (
@@ -187,68 +269,82 @@ const TimelineVisualizer: React.FC<TimelineVisualizerProps> = ({
           />
         </div>
 
-        {elements.map((el) => (
-          <Draggable
-            key={el.id}
-            axis="x"
-            bounds="parent"
-            defaultPosition={{ x: el.position, y: 40 }}
-            onStop={(_, data) => handleDragStop(el.id, data.x)}
+        {/* Containers and draggable elements */}
+        {containers.map(({ id, startPosition, width, element }) => (
+          <div
+            key={id}
+            className="absolute inset-y-0 my-auto h-16" // Center vertically and set height
+            style={{
+              left: `${startPosition}px`,
+              width: `${width}px`,
+            }}
+            onClick={(e) => e.stopPropagation()} // Prevent timeline clicks on containers
           >
-            <div
-              className="absolute h-16 bg-gray-700 border border-gray-600 rounded-lg flex items-center cursor-grab"
-              style={{ width: `${el.width}px` }}
+            <Draggable
+              axis="x"
+              bounds="parent"
+              position={{ x: element.position - startPosition, y: 0 }} // Align Y to match container
+              onStart={() => setIsDragging(true)}
+              onStop={(_, data) => handleDragStop(id, data.x + startPosition)}
+              disabled={resizingRef.current}
             >
-              <div className="bg-green-600 text-white text-xs font-bold px-2 py-1">
-                {el.id}
-              </div>
-              <div className="text-gray-200 text-sm px-2 truncate">
-                {el.text}
-              </div>
-
               <div
-                className="timelineSentenceHandle"
-                style={{
-                  position: "absolute",
-                  width: "9px",
-                  height: "100%",
-                  left: `${el.width - 9}px`,
-                  cursor: "col-resize",
-                }}
-                onMouseDown={(e) => {
-                  e.stopPropagation();
-                  let startX = e.clientX;
-
-                  const onMouseMove = (moveEvent: MouseEvent) => {
-                    const delta = moveEvent.clientX - startX;
-                    handleResize(el.id, delta);
-                    startX = moveEvent.clientX;
-                  };
-
-                  const onMouseUp = () => {
-                    document.removeEventListener("mousemove", onMouseMove);
-                    document.removeEventListener("mouseup", onMouseUp);
-                  };
-
-                  document.addEventListener("mousemove", onMouseMove);
-                  document.addEventListener("mouseup", onMouseUp);
-                }}
+                className="h-16 bg-gray-700 border border-gray-600 rounded-lg flex items-center cursor-grab"
+                style={{ width: `${element.width}px` }}
+                onClick={(e) => e.stopPropagation()} // Prevent timeline clicks on draggable elements
               >
+                <div className="bg-green-600 text-white text-xs font-bold px-2 py-1">
+                  {id}
+                </div>
+                <div className="text-gray-200 text-sm px-2 truncate">
+                  {element.text}
+                </div>
+
                 <div
-                  className="timelineResizeHandle"
+                  className="timelineSentenceHandle"
                   style={{
-                    textAlign: "center",
-                    userSelect: "none",
+                    position: "absolute",
+                    width: "9px",
+                    height: "100%",
+                    left: `${element.width - 9}px`,
+                    cursor: "col-resize",
+                  }}
+                  onMouseDown={(e) => {
+                    e.stopPropagation();
+                    resizingRef.current = true;
+                    let startX = e.clientX;
+
+                    const onMouseMove = (moveEvent: MouseEvent) => {
+                      const delta = moveEvent.clientX - startX;
+                      handleResize(id, delta);
+                      startX = moveEvent.clientX;
+                    };
+
+                    const onMouseUp = () => {
+                      resizingRef.current = false;
+                      document.removeEventListener("mousemove", onMouseMove);
+                      document.removeEventListener("mouseup", onMouseUp);
+                    };
+
+                    document.addEventListener("mousemove", onMouseMove);
+                    document.addEventListener("mouseup", onMouseUp);
                   }}
                 >
-                  ☰
+                  <div
+                    className="timelineResizeHandle"
+                    style={{
+                      textAlign: "center",
+                      userSelect: "none",
+                    }}
+                  >
+                    ☰
+                  </div>
                 </div>
               </div>
-            </div>
-          </Draggable>
+            </Draggable>
+          </div>
         ))}
       </div>
-      {/* Visualizer */}
       {visualizer && (
         <div className="absolute bottom-0 left-0 right-0 bg-black">
           {visualizer}

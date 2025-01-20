@@ -1,16 +1,9 @@
 import React, { useState, useRef, useEffect } from "react";
-import {
-  Play,
-  Pause,
-  SkipBack,
-  Maximize2,
-  Settings,
-  Clock,
-  Upload,
-} from "lucide-react";
-import TimelineVisualizer from "./Timeline";
+import { Play, Pause, Settings, Clock, Upload } from "lucide-react";
+// import TimelineVisualizer from
 import { AudioVisualizer } from "react-audio-visualize";
 import AudioExtractionVisualizer from "./AudioExtractionVizualizer";
+import TimelineVisualizer from "./Timeline";
 
 interface VideoDescriptionItem {
   startTime: string;
@@ -71,48 +64,55 @@ const TranscriptionEditor2: React.FC<VideoTimelineProps> = ({
     }
   }, [uploadedVideo]);
 
-  const extractAudio = async (videoFile: File) => {
-    // Use type assertion to access webkitAudioContext
-    const audioContext = new (window.AudioContext ||
-      (window as any).AudioContext)();
-    const arrayBuffer = await videoFile.arrayBuffer();
+  // const extractAudio = async (videoFile: File) => {
+  //   // Use type assertion to access webkitAudioContext
+  //   const audioContext = new (window.AudioContext ||
+  //     (window as any).AudioContext)();
+  //   const arrayBuffer = await videoFile.arrayBuffer();
 
-    audioContext.decodeAudioData(
-      arrayBuffer,
-      (audioData) => {
-        // Create a new audio buffer source
-        const source = audioContext.createBufferSource();
-        source.buffer = audioData;
+  //   audioContext.decodeAudioData(
+  //     arrayBuffer,
+  //     (audioData) => {
+  //       // Create a new audio buffer source
+  //       const source = audioContext.createBufferSource();
+  //       source.buffer = audioData;
 
-        // Create a MediaStreamDestination to get the audio stream
-        const destination = audioContext.createMediaStreamDestination();
-        source.connect(destination);
-        source.start(0);
+  //       // Create a MediaStreamDestination to get the audio stream
+  //       const destination = audioContext.createMediaStreamDestination();
+  //       source.connect(destination);
+  //       source.start(0);
 
-        // Create a new audio blob from the MediaStream
-        const mediaStream = destination.stream;
-        const recorder = new MediaRecorder(mediaStream);
-        const audioChunks: Blob[] = [];
+  //       // Create a new audio blob from the MediaStream
+  //       const mediaStream = destination.stream;
+  //       const recorder = new MediaRecorder(mediaStream);
+  //       const audioChunks: Blob[] = [];
 
-        recorder.ondataavailable = (event) => {
-          audioChunks.push(event.data);
-        };
+  //       recorder.ondataavailable = (event) => {
+  //         audioChunks.push(event.data);
+  //       };
 
-        recorder.onstop = () => {
-          const audioBlob = new Blob(audioChunks, { type: "audio/wav" });
-          setAudioBlob(audioBlob); // Set the audio blob
-          console.log("Audio blob created:", audioBlob);
-        };
+  //       recorder.onstop = () => {
+  //         const audioBlob = new Blob(audioChunks, { type: "audio/wav" });
+  //         setAudioBlob(audioBlob); // Set the audio blob
+  //         console.log("Audio blob created:", audioBlob);
+  //       };
 
-        recorder.start();
-        source.onended = () => {
-          recorder.stop();
-        };
-      },
-      (error) => {
-        console.error("Error decoding audio data:", error);
-      }
-    );
+  //       recorder.start();
+  //       source.onended = () => {
+  //         recorder.stop();
+  //       };
+  //     },
+  //     (error) => {
+  //       console.error("Error decoding audio data:", error);
+  //     }
+  //   );
+  // };
+
+  const handleTimelineUpdate = (newTime: number) => {
+    if (videoRef.current) {
+      videoRef.current.currentTime = newTime;
+      setCurrentTime(newTime);
+    }
   };
 
   // High-precision time update using requestAnimationFrame
@@ -198,7 +198,7 @@ const TranscriptionEditor2: React.FC<VideoTimelineProps> = ({
           onDescriptionChange(processedDescriptions);
           const url = URL.createObjectURL(file);
           setVideoFile(url);
-          extractAudio(file); // Extract audio from the uploaded video
+          // extractAudio(file); // Extract audio from the uploaded video
         } else {
           alert("Error processing video");
         }
@@ -264,6 +264,7 @@ const TranscriptionEditor2: React.FC<VideoTimelineProps> = ({
         <option value="openAI_image">OpenAI with images</option>
         <option value="gemini_whole_video">Gemini only video</option>
         <option value="gemini_optimized">Gemini optimized</option>
+        <option value="mock">Mock</option>
       `;
 
       const dialog = document.createElement("dialog");
@@ -433,7 +434,12 @@ const TranscriptionEditor2: React.FC<VideoTimelineProps> = ({
                 {currentTime.toFixed(3)}s / {videoDuration.toFixed(3)}s
               </span>
             </div>
-            <button className="mr-2 p-2 bg-gray-200 rounded hover:bg-gray-300" onClick={handleEncodeVideo}>Encode Video</button>
+            <button
+              className="mr-2 p-2 bg-gray-200 rounded hover:bg-gray-300"
+              onClick={handleEncodeVideo}
+            >
+              Encode Video
+            </button>
           </div>
         </div>
 
@@ -443,6 +449,7 @@ const TranscriptionEditor2: React.FC<VideoTimelineProps> = ({
             videoDescriptions={videoDescriptions}
             currentTime={currentTime}
             onDescriptionChange={onDescriptionChange}
+            onTimeUpdate={handleTimelineUpdate}
             visualizer={<div></div>}
           />
         </div>
