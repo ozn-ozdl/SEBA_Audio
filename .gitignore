@@ -165,5 +165,6 @@ cython_debug/
 /backend/processed
 /backend/uploads
 /backend/frames
-backend/audio
-backend/waveforms
+/backend/audio
+/backend/waveforms 
+/backend/scenes_results

@@ -121,6 +121,46 @@ const TimelineVisualizer: React.FC<TimelineVisualizerProps> = ({
     }
   }, [currentTime]);
 
+const addNewScene = () => {
+  const currentPosition = currentTime * 100;
+
+  // Create the new scene
+  const newSceneElement: TimelineElement = {
+    id: 0, // Temporary ID, will be reassigned after sorting
+    text: "New Scene",
+    position: currentPosition,
+    width: 100, // Default width
+    startTime: pixelsToTime(currentPosition),
+    endTime: pixelsToTime(currentPosition + 100),
+    color: "bg-red-600",
+  };
+
+  setElements((prev) => {
+    // Add the new scene and sort by position
+    const updatedElements = [...prev, newSceneElement].sort(
+      (a, b) => a.position - b.position
+    );
+
+    // Reassign IDs based on new order
+    const reassignedElements = updatedElements.map((el, index) => ({
+      ...el,
+      id: index + 1, // IDs start from 1
+    }));
+
+    // Update video descriptions in the correct order
+    const updatedDescriptions = reassignedElements.map((el) => ({
+      startTime: el.startTime,
+      endTime: el.endTime,
+      description: el.text,
+      videoUrl: "", // Default or placeholder URL
+    }));
+
+    onDescriptionChange(updatedDescriptions);
+
+    return reassignedElements;
+  });
+};
+
   useEffect(() => {
     if (videoDescriptions.length > 0) {
       const maxEndTime = Math.max(
@@ -244,6 +284,17 @@ const TimelineVisualizer: React.FC<TimelineVisualizerProps> = ({
       onWheel={handleWheel}
       style={{ cursor: "grab", width: "100%" }}
     >
+      {/* Plus button above the red line */}
+      <button
+        className="absolute z-20 bg-green-600 text-white rounded-full p-2 shadow-lg hover:bg-green-700 transition"
+        style={{
+          left: `${currentTime * 100 - 16}px`, // Center the button above the red line
+          top: "-24px", // Position the button above the timeline
+        }}
+        onClick={addNewScene}
+      >
+        +
+      </button>
       <div className="relative h-full" style={{ width: `${timelineWidth}px` }}>
         {/* Clickable background layer */}
         <div className="absolute inset-0" onClick={handleTimelineClick} />
@@ -263,6 +314,7 @@ const TimelineVisualizer: React.FC<TimelineVisualizerProps> = ({
               </div>
             )
           )}
+          {/* Red bar */}
           <div
             className="absolute h-full w-0.5 bg-red-500 z-10"
             style={{ left: `${currentTime * 100}px` }}

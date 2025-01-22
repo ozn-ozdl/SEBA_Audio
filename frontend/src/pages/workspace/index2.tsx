@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from "react";
 import { Video, Play, Pause, Save } from "lucide-react";
-// import "./App.css";
 import TranscriptionEditor2 from "src/components/Editor2";
 import { useLocalStorage } from "@uidotdev/usehooks";
 
@@ -25,8 +24,12 @@ const Workspace2: React.FC = () => {
   const [audio, setAudio] = useState<HTMLAudioElement | null>(null);
   const [videoDescriptionsStorage, setVideoDescriptionsStorage] =
     useLocalStorage<
-      { name: string; data: VideoDescriptionItem[]; date: string }[]
-    >(`video_descriptions`, []);
+      {
+        name: string;
+        data: VideoDescriptionItem[];
+        date: string;
+      }[]
+    >("video_descriptions", []);
 
   // Update combined descriptions when video descriptions change
   useEffect(() => {
@@ -47,6 +50,65 @@ const Workspace2: React.FC = () => {
       }
     }
   }, [videoDescriptionsStorage, name]);
+
+  // Compare timestamps and send only the changed ones
+  const compareTimestamps = (
+    oldTimestamps: VideoDescriptionItem[],
+    newTimestamps: VideoDescriptionItem[]
+  ) => {
+    const modifiedItems = [];
+    for (let i = 0; i < newTimestamps.length; i++) {
+      if (
+        oldTimestamps[i] &&
+        (oldTimestamps[i].startTime !== newTimestamps[i].startTime ||
+          oldTimestamps[i].endTime !== newTimestamps[i].endTime)
+      ) {
+        modifiedItems.push(newTimestamps[i]);
+      }
+    }
+    return modifiedItems;
+  };
+
+  const reprocessDescriptions = async (
+    modifiedDescriptions: VideoDescriptionItem[]
+  ) => {
+    try {
+      const response = await fetch(
+        "http://localhost:5000/reprocess-descriptions",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            timestamps: modifiedDescriptions.map((item) => [
+              item.startTime,
+              item.endTime,
+            ]),
+            descriptions: modifiedDescriptions.map((item) => item.description),
+          }),
+        }
+      );
+
+      if (response.ok) {
+        const result = await response.json();
+
+        // Update state with the newly reprocessed descriptions
+        setVideoDescriptions(
+          result.timestamps.map((timestamp: any, index: number) => ({
+            startTime: timestamp[0],
+            endTime: timestamp[1],
+            description: result.descriptions[index],
+            videoUrl: `http://localhost:5000/scene_files/${result.scene_files[index]}`,
+          }))
+        );
+      } else {
+        alert("Error reprocessing descriptions");
+      }
+    } catch (error) {
+      alert("Error connecting to backend");
+    }
+  };
 
   // Video processing function
   const handleProcessVideo = async (videoFile: File, action: string) => {
@@ -76,8 +138,20 @@ const Workspace2: React.FC = () => {
           })
         );
 
-        setUploadedVideo(videoFile);
-        setVideoDescriptions(processedDescriptions);
+        // Compare previous and new timestamps
+        const modifiedDescriptions = compareTimestamps(
+          videoDescriptions,
+          processedDescriptions
+        );
+
+        if (modifiedDescriptions.length > 0) {
+          // Send only modified descriptions for reprocessing
+          setUploadedVideo(videoFile);
+          setVideoDescriptions(modifiedDescriptions);
+        } else {
+          // No changes, show a message or keep the existing descriptions
+          alert("No changes detected.");
+        }
       } else {
         alert("Error processing video");
       }
@@ -123,6 +197,48 @@ const Workspace2: React.FC = () => {
         audio.currentTime = 0; // Reset audio to the beginning
       }
       setSpeechActive(false);
+    }
+  };
+
+  const handleAudioRequest = async () => {
+    const formData = new FormData();
+
+    try {
+      // Use the existing `videoDescriptions` object
+      const descriptionsWithId = videoDescriptions.map((item) => ({
+        timestamps: [item.startTime, item.endTime],
+        // scene_id: item.id, // Assuming each description has an `id`
+      }));
+
+      formData.append("descriptions", JSON.stringify(descriptionsWithId));
+
+      // Send request to generate audio files
+      const response = await fetch("http://localhost:5000/text-to-speech", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (response.ok) {
+        const result = await response.blob();
+        // Handle the downloaded audio files (either a zip or a single file)
+        const link = document.createElement("a");
+        const audioUrl = URL.createObjectURL(result);
+
+        // If the response is a zip file, it will be handled here
+        if (result.type === "application/zip") {
+          link.href = audioUrl;
+          link.download = "audio_files.zip"; // Download as zip if multiple files
+        } else {
+          link.href = audioUrl;
+          link.download = "audio_description.mp3"; // Single file download
+        }
+
+        link.click();
+      } else {
+        alert("Error generating audio descriptions");
+      }
+    } catch (error) {
+      alert("Error connecting to backend");
     }
   };
 

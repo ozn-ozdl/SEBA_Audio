@@ -1,12 +1,13 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, ChangeEvent } from "react";
 import { Play, Pause, Settings, Clock, Upload } from "lucide-react";
-import TimelineVisualizer from "./Timeline";
+import TimelineVisualizer from "./Timeline2";
+import TimelineVisualizer2 from "./Timeline2";
 
 interface VideoDescriptionItem {
   startTime: string;
   endTime: string;
   description: string;
-  videoUrl: string;
+  audioFile?: string;
 }
 
 interface VideoTimelineProps {
@@ -17,30 +18,39 @@ interface VideoTimelineProps {
   setUploadedVideo: (file: File | null) => void;
   handleEncodeVideo: () => void;
   toggleAudioDescription: () => void;
+  handleAnalyzeVideo: (videoFile: File, action: string) => Promise<void>;
+  handleReanalyzeVideo: () => void;
+  handleRegenerateAudio: () => void;
 }
 
-const TranscriptionEditor2: React.FC<VideoTimelineProps> = ({
+const TranscriptionEditor3: React.FC<VideoTimelineProps> = ({
   videoDescriptions,
   onDescriptionChange,
   uploadedVideo,
-  handleEncodeVideo
+  onProcessVideo,
+  setUploadedVideo,
+  handleEncodeVideo,
+  toggleAudioDescription,
+  handleRegenerateAudio,
+  handleReanalyzeVideo,
+  handleAnalyzeVideo,
 }) => {
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
   const [currentTime, setCurrentTime] = useState<number>(0);
   const [videoDuration, setVideoDuration] = useState<number>(0);
-  const [videoFile, setVideoFile] = useState<string | null>(null);
-  const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
+  const [videoUrl, setVideoUrl] = useState<string>("");
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const animationRef = useRef<number | null>(null);
   const [selectedScene, setSelectedScene] = useState<string | null>(null);
   const [currentSubtitle, setCurrentSubtitle] = useState<string>("");
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const [videoFile, setVideoFile] = useState<File | null>(null);
 
-  // Update current subtitle based on video time
   useEffect(() => {
     if (videoDescriptions.length === 0) return;
 
+    // console.log(videoDescriptions);
     const currentTimeInSeconds = currentTime;
     const currentScene = videoDescriptions.find((scene) => {
       const startTime = convertTimestampToSeconds(scene.startTime);
@@ -53,12 +63,10 @@ const TranscriptionEditor2: React.FC<VideoTimelineProps> = ({
     setCurrentSubtitle(currentScene?.description || "");
   }, [currentTime, videoDescriptions]);
 
-  // Update video file and create audio blob when uploadedVideo changes
   useEffect(() => {
     if (uploadedVideo) {
       const url = URL.createObjectURL(uploadedVideo);
-      setVideoFile(url);
-      // extractAudio(uploadedVideo); // Extract audio from the uploaded video
+      setVideoUrl(url);
     }
   }, [uploadedVideo]);
 
@@ -69,7 +77,6 @@ const TranscriptionEditor2: React.FC<VideoTimelineProps> = ({
     }
   };
 
-  // High-precision time update using requestAnimationFrame
   useEffect(() => {
     if (isPlaying && videoRef.current) {
       const updateCurrentTime = () => {
@@ -115,98 +122,77 @@ const TranscriptionEditor2: React.FC<VideoTimelineProps> = ({
     setIsPlaying(!isPlaying);
   };
 
-  const handleVideoUpload = async (
-    event: React.ChangeEvent<HTMLInputElement>
-  ) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      setIsProcessing(true);
-      const formData = new FormData();
+  // const handleVideoUpload = async (
+  //   event: React.MouseEvent<HTMLButtonElement>
+  // ) => {
+  //   const file = event.target.files?.[0];
+  //   if (file) {
+  //     setIsProcessing(true);
+  //     const action = await showProcessingOptions();
+  //     if (!action) {
+  //       setIsProcessing(false);
+  //       return;
+  //     }
 
-      const action = await showProcessingOptions();
-      if (!action) {
-        setIsProcessing(false);
-        return;
-      }
+  //     try {
+  //       await handleAnalyzeVideo(file, "new_gemini");
+  //       const url = URL.createObjectURL(file);
+  //       setVideoFile(url);
+  //     } catch (error) {
+  //       alert("Error processing video");
+  //     } finally {
+  //       setIsProcessing(false);
+  //     }
+  //   }
+  // };
 
-      formData.append("action", action);
-      formData.append("video", file);
+  // const handleVideoUpload = async (event: MouseEvent<HTMLButtonElement, MouseEvent>) => {
 
-      try {
-        const response = await fetch("http://localhost:5000/process-video", {
-          method: "POST",
-          body: formData,
-        });
+  // }
 
-        if (response.ok) {
-          const result = await response.json();
-          const processedDescriptions = result.timestamps.map(
-            (timestamp: any, index: number) => ({
-              startTime: timestamp[0],
-              endTime: timestamp[1],
-              description: result.descriptions[index],
-              videoUrl: `http://localhost:5000/scene_files/${result.scene_files[index]}`,
-            })
-          );
+  //   const showProcessingOptions = async (): Promise<string | null> => {
+  //     return new Promise((resolve) => {
+  //       const select = document.createElement("select");
+  //       select.innerHTML = `
+  //         <option value="">Choose an Action</option>
+  //         <option value="openAI_image">OpenAI with images</option>
+  //         <option value="gemini_whole_video">Gemini only video</option>
+  //         <option value="gemini_optimized">Gemini optimized</option>
+  //         <option value="mock">Mock</option>
+  //         <option value="new_gemini">New Gemini</option>
+  //       `;
 
-          onDescriptionChange(processedDescriptions);
-          const url = URL.createObjectURL(file);
-          setVideoFile(url);
-          // extractAudio(file); // Extract audio from the uploaded video
-        } else {
-          alert("Error processing video");
-        }
-      } catch (error) {
-        alert("Error connecting to backend");
-      } finally {
-        setIsProcessing(false);
-      }
-    }
-  };
+  //       const dialog = document.createElement("dialog");
+  //       dialog.innerHTML = `
+  //         <div class="p-4">
+  //           <h2 class="text-lg font-semibold">Select Processing Option</h2>
+  //           ${select.outerHTML}
+  //           <div class="mt-4">
+  //             <button id="confirm" class="bg-blue-500 text-white px-4 py-2 rounded">Confirm</button>
+  //             <button id="cancel" class="bg-gray-300 text-black px-4 py-2 rounded">Cancel</button>
+  //           </div>
+  //         </div>
+  //       `;
 
-  const showProcessingOptions = async (): Promise<string | null> => {
-    return new Promise((resolve) => {
-      const select = document.createElement("select");
-      select.innerHTML = `
-        <option value="">Choose an Action</option>
-        <option value="openAI_image">OpenAI with images</option>
-        <option value="gemini_whole_video">Gemini only video</option>
-        <option value="gemini_optimized">Gemini optimized</option>
-        <option value="mock">Mock</option>
-        <option value="new_gemini">New Gemini</option>
-      `;
+  //       document.body.appendChild(dialog);
+  //       dialog.showModal();
 
-      const dialog = document.createElement("dialog");
-      dialog.innerHTML = `
-        <div class="p-4">
-          <h2 class="text-lg font-semibold">Select Processing Option</h2>
-          ${select.outerHTML}
-          <div class="mt-4">
-            <button id="confirm" class="bg-blue-500 text-white px-4 py-2 rounded">Confirm</button>
-            <button id="cancel" class="bg-gray-300 text-black px-4 py-2 rounded">Cancel</button>
-          </div>
-        </div>
-      `;
+  //       dialog.querySelector("#confirm")?.addEventListener("click", () => {
+  //         const selectedValue = (
+  //           dialog.querySelector("select") as HTMLSelectElement
+  //         ).value;
+  //         dialog.close();
+  //         document.body.removeChild(dialog);
+  //         resolve(selectedValue || null);
+  //       });
 
-      document.body.appendChild(dialog);
-      dialog.showModal();
-
-      dialog.querySelector("#confirm")?.addEventListener("click", () => {
-        const selectedValue = (
-          dialog.querySelector("select") as HTMLSelectElement
-        ).value;
-        dialog.close();
-        document.body.removeChild(dialog);
-        resolve(selectedValue || null);
-      });
-
-      dialog.querySelector("#cancel")?.addEventListener("click", () => {
-        dialog.close();
-        document.body.removeChild(dialog);
-        resolve(null);
-      });
-    });
-  };
+  //       dialog.querySelector("#cancel")?.addEventListener("click", () => {
+  //         dialog.close();
+  //         document.body.removeChild(dialog);
+  //         resolve(null);
+  //       });
+  //     });
+  //   };
 
   const handleTimeUpdate = (): void => {
     if (videoRef.current) {
@@ -223,10 +209,83 @@ const TranscriptionEditor2: React.FC<VideoTimelineProps> = ({
     onDescriptionChange(updatedDescriptions);
   };
 
+  // const handleVideoUpload = async (
+  //   event: React.MouseEvent<HTMLButtonElement>
+  // ) => {
+  //   const file = event.target.files?.[0];
+  //   if (file) {
+  //     setIsProcessing(true);
+  //     const action = await showProcessingOptions();
+  //     if (!action) {
+  //       setIsProcessing(false);
+  //       return;
+  //     }
+
+  //     try {
+  //       await handleAnalyzeVideo(file, "new_gemini");
+  //       const url = URL.createObjectURL(file);
+  //       setVideoFile(url);
+  //     } catch (error) {
+  //       alert("Error processing video");
+  //     } finally {
+  //       setIsProcessing(false);
+  //     }
+  //   }
+  // };
+
+  // const handleVideoUpload = async (event: ChangeEvent<HTMLInputElement>) => {
+  //   const file = event.target.files?.[0];
+  //   if (file) {
+  //     setIsProcessing(true);
+  //     const action = await showProcessingOptions();
+  //     if (!action) {
+  //       setIsProcessing(false);
+  //       return;
+  //     }
+
+  //     try {
+  //       await handleAnalyzeVideo(file, "new_gemini");
+  //       const url = URL.createObjectURL(file);
+  //       setVideoFile(url);
+  //     } catch (error) {
+  //       alert("Error processing video");
+  //     } finally {
+  //       setIsProcessing(false);
+  //     }
+  //   }
+  // };
+
+  const handleVideoUpload = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      setVideoUrl(URL.createObjectURL(file));
+      setVideoFile(file);
+    }
+  };
+
+  // function analyzeVideo(
+  //   event: MouseEvent<HTMLButtonElement, MouseEvent>
+  // ): void {
+  //   throw new Error("Function not implemented.");
+  // }
+
+  const analyzeVideo = async (): Promise<void> => {
+    if (videoFile) {
+      try {
+        setIsProcessing(true);
+        await handleAnalyzeVideo(videoFile, "new_gemini");
+        const url = URL.createObjectURL(videoFile);
+        setVideoUrl(url);
+      } catch (error) {
+        alert("Error processing video");
+      } finally {
+        setIsProcessing(false);
+      }
+    }
+  };
 
   return (
     <div className="max-w-full overflow-hidden bg-gray-50 h-screen">
-      {/* Top Toolbar */}
       <div className="flex justify-between items-center p-4 bg-gray-800 text-white shadow-md">
         <div className="flex items-center">
           <button className="mr-2">
@@ -239,40 +298,41 @@ const TranscriptionEditor2: React.FC<VideoTimelineProps> = ({
         </div>
       </div>
 
-      {/* Main Content Area */}
       <div className="grid grid-cols-10 grid-rows-10 h-full">
-        {/* Left Sidebar - Transcription */}
         <div className="col-span-5 row-span-7 p-4 bg-white shadow-md overflow-y-auto">
           <div className="mb-4">
             <span className="font-bold text-xl">Transcription</span>
           </div>
           <div>
-            {videoDescriptions.map((scene, index) => (
-              <div
-                key={scene.startTime}
-                className={`p-2 mb-2 rounded-lg border ${
-                  selectedScene === scene.startTime
-                    ? "bg-blue-500 text-black" // Selected state
-                    : "hover:bg-gray-200" // Default hover state
-                }`}
-                onClick={() => setSelectedScene(scene.startTime)} // Set selected scene on click
-              >
-                <div>
-                  {`Scene ${index + 1}: ${scene.startTime} - ${scene.endTime}`}
+            {videoDescriptions
+              .filter((scene) => scene.description !== "TALKING")
+              .map((scene, index) => (
+                <div
+                  key={scene.startTime}
+                  className={`p-2 mb-2 rounded-lg border ${
+                    selectedScene === scene.startTime
+                      ? "bg-blue-500 text-black"
+                      : "hover:bg-gray-200"
+                  }`}
+                  onClick={() => setSelectedScene(scene.startTime)}
+                >
+                  <div>
+                    {`Scene ${index + 1}: ${scene.startTime} - ${
+                      scene.endTime
+                    }`}
+                  </div>
+                  <textarea
+                    className="w-full border border-gray-300 rounded p-1 mt-1"
+                    value={scene.description}
+                    onChange={(e) =>
+                      updateSceneText(scene.startTime, e.target.value)
+                    }
+                  />
                 </div>
-                <textarea
-                  className="w-full border border-gray-300 rounded p-1 mt-1"
-                  value={scene.description}
-                  onChange={(e) =>
-                    updateSceneText(scene.startTime, e.target.value)
-                  }
-                />
-              </div>
-            ))}
+              ))}
           </div>
         </div>
 
-        {/* Video Preview Area */}
         <div className="col-span-5 row-span-7 flex flex-col p-4 bg-white shadow-md">
           <div className="flex-grow mb-4 relative">
             {videoFile ? (
@@ -280,11 +340,10 @@ const TranscriptionEditor2: React.FC<VideoTimelineProps> = ({
                 <video
                   ref={videoRef}
                   className="w-full rounded-lg shadow-lg"
-                  src={videoFile}
+                  src={videoUrl}
                   onLoadedMetadata={handleLoadedMetadata}
-                  controls={false} // Custom controls
+                  controls={false}
                 />
-                {/* Subtitle Overlay */}
                 <div className="absolute bottom-8 left-0 right-0 flex justify-center">
                   <div className="bg-black bg-opacity-50 px-4 py-2 rounded-lg max-w-2xl text-center">
                     <p className="text-white text-lg font-semibold">
@@ -310,7 +369,6 @@ const TranscriptionEditor2: React.FC<VideoTimelineProps> = ({
             )}
           </div>
 
-          {/* Play/Pause Button Row */}
           <div className="flex items-center mb-2 col-span-6">
             <div>
               <button
@@ -336,18 +394,35 @@ const TranscriptionEditor2: React.FC<VideoTimelineProps> = ({
             >
               Encode Video
             </button>
+            <button
+              className="mr-2 p-2 bg-gray-200 rounded hover:bg-gray-300"
+              onClick={analyzeVideo}
+            >
+              Analyze Video
+            </button>
+            <button
+              className="mr-2 p-2 bg-gray-200 rounded hover:bg-gray-300"
+              onClick={handleReanalyzeVideo}
+            >
+              Reanalyze Video
+            </button>
+            <button
+              className="mr-2 p-2 bg-gray-200 rounded hover:bg-gray-300"
+              onClick={handleRegenerateAudio}
+            >
+              Regenerate Audio
+            </button>
           </div>
         </div>
 
-        {/* Timeline Visualizer with AudioVisualizer */}
         <div className="col-span-10 row-span-2 p-4 bg-white shadow-md">
-          <TimelineVisualizer
+          <TimelineVisualizer2
             videoDescriptions={videoDescriptions}
             currentTime={currentTime}
             onDescriptionChange={onDescriptionChange}
             onTimeUpdate={handleTimelineUpdate}
             visualizer={<div></div>}
-            // blockedTimes={[]}
+            isPlaying={isPlaying}  
           />
         </div>
       </div>
@@ -355,7 +430,6 @@ const TranscriptionEditor2: React.FC<VideoTimelineProps> = ({
   );
 };
 
-// Utility function to convert timestamp to seconds
 const convertTimestampToSeconds = (timestamp: string): number => {
   const parts = timestamp.split(":");
   const seconds = parseFloat(parts.pop() || "0");
@@ -364,4 +438,4 @@ const convertTimestampToSeconds = (timestamp: string): number => {
   return hours * 3600 + minutes * 60 + seconds;
 };
 
-export default TranscriptionEditor2;
+export default TranscriptionEditor3;

@@ -1,4 +1,10 @@
+import json
+import mimetypes
 import os
+from zipfile import ZipFile
+
+from requests import Response
+from common_functions import convert_text_to_speech
 from flask import Flask, request, jsonify, send_from_directory, send_file
 from flask_cors import CORS
 import shutil
@@ -8,15 +14,17 @@ import openAI_images.scene_frames_to_descriptions as sftd
 import openAI_images.get_return_values as grv
 from openAI_images.vidToDesGemini import describe_with_gemini_whole_video, get_video_duration
 import openAI_images.scenes_to_description_optimized_gemini as sg
+import openAI_images.newGemini as ng
 import subprocess
 import tempfile
 from gtts import gTTS
 import os
 import numpy as np
-import wave
-import matplotlib.pyplot as plt
-import librosa
-import librosa.display
+from datetime import datetime
+import tempfile
+import traceback
+
+
 
 app = Flask(__name__)
 app.config['MAX_CONTENT_LENGTH'] = 30 * 1024 * 1024
@@ -33,7 +41,6 @@ WAVEFORM_FOLDER = "./waveforms"
 os.makedirs(PROCESSED_FOLDER, exist_ok=True)
 os.makedirs(AUDIO_FOLDER, exist_ok=True)
 
-
 def setup():
     os.makedirs(UPLOAD_FOLDER, exist_ok=True)
     if os.path.exists(FRAMES_FOLDER):
@@ -45,26 +52,87 @@ def setup():
     os.makedirs(SCENES_FOLDER, exist_ok=True)
     os.makedirs(WAVEFORM_FOLDER, exist_ok=True)
 
-
 @app.route("/")
 def hello_geek():
     return "<h1>Hello from Flask & Docker</h1>"
-
-# TODO: set useful variables as possible in the frontend by the user and do not hardcode them in the backend (e.g. ssim_threshold, hist_threshold, etc.)
-
 
 @app.route("/scene_files/<path:filename>", methods=["GET"])
 def get_scene_files(filename):
     return send_from_directory(SCENES_FOLDER, filename)
 
+@app.route("/audio/<path:filename>", methods=["GET"])
+def get_audio_files(filename):
+    try:
+        filepath = os.path.join(AUDIO_FOLDER, filename)
+        print(filepath)
+        mimetype, _ = mimetypes.guess_type(filepath)
+        return send_file(
+            filepath,
+            mimetype=mimetype,
+            as_attachment=False,
+            download_name=filename
+        )
+    except Exception as e:
+        return Response(str(e), status=404)
 
-import traceback
 
+@app.route("/analyze-timestamps", methods=["POST"])
+def analyze_timestamps():
+    print("Analyzing timestamps")
+
+    # Check for video file and timestamps in the request
+    if "video" not in request.files:
+        return jsonify({"error": "No video file provided"}), 400
+
+    if "timestamps" not in request.form:
+        return jsonify({"error": "No timestamps provided"}), 400
+
+    # Get the video file and timestamps
+    video_file = request.files["video"]
+    old_timestamps = request.form.get("old_timestamps")  # Old timestamps
+    new_timestamps = request.form.get("new_timestamps")  # New timestamps
+
+    # Parse the timestamps from the form (assuming they're comma-separated)
+    try:
+        old_timestamps = [tuple(ts.split('-')) for ts in old_timestamps.split(',')]
+        new_timestamps = [tuple(ts.split('-')) for ts in new_timestamps.split(',')]
+    except Exception as e:
+        return jsonify({"error": f"Invalid timestamp format: {str(e)}"}), 400
+
+    video_path = os.path.join(UPLOAD_FOLDER, video_file.filename)
+    video_file.save(video_path)
+
+    print("video_path:", video_path)
+    print("Old Timestamps:", old_timestamps)
+    print("New Timestamps:", new_timestamps)
+
+    try:
+        # Step 1: Compare and combine timestamps
+        # Assuming the timestamps are in the format (start_time, end_time)
+        combined_timestamps = sorted(set(old_timestamps + new_timestamps), key=lambda x: x[0])
+
+        # Step 2: Cut the video by the combined timestamps
+        combined_segments = ng.process_timestamps(combined_timestamps)
+        ng.cut_video_by_no_talking(video_path, combined_segments, "scenes_results")
+
+        # Step 3: Describe the scenes based on the new combined segments
+        output = ng.describe_existing_segments("scenes_results", combined_segments)
+
+        # Step 4: Format the response data
+        response_data = ng.format_response_data(combined_segments, output)
+
+        return jsonify(response_data), 200
+
+    except Exception as e:
+        # Print the full exception traceback
+        print("An error occurred:")
+        print(traceback.format_exc())
+        return jsonify({"error": str(e)}), 500
+  
 @app.route("/process-video", methods=["POST"])
 def process_video():
     print("Working")
     
-    # Print the entire request data
     print("Request data:")
     print("Form data:", request.form)
     print("Files:", request.files)
@@ -82,137 +150,26 @@ def process_video():
     print("video_path:", video_path)
     print("action:", action)
 
-
     try:
-        # Extract audio from the video
-        audio_path = os.path.join(tempfile.gettempdir(), "extracted_audio.wav")
-        ffmpeg_command = [
-            "ffmpeg",
-            "-i", video_path,
-            "-q:a", "0",  # Preserve audio quality
-            "-map", "a",  # Extract only the audio stream
-            "-y",         # Overwrite the file if it exists
-            audio_path
-        ]
-        subprocess.run(ffmpeg_command, check=True)
+        if action == "new_gemini":
+            print("action: new_gemini")
 
-        # Generate waveform
-        waveform_image_path = generate_waveform(audio_path)
-        
-        if action == "openAI_image":
-            vtf.extract_frames_from_video(video_path, FRAMES_FOLDER, 2)
-            scene_changes = dsc.detect_scene_changes(FRAMES_FOLDER, 0.3, 0.4)
-            scene_descriptions, scene_frames = sftd.describe_scenes_with_openai(
-                scene_changes, FRAMES_FOLDER)
-            timestamps, scene_descriptions_final = grv.get_timestamps_and_descriptions(
-                scene_frames, 60, 2, scene_descriptions)
-            scene_files = grv.extract_scenes(
-                video_path, timestamps, SCENES_FOLDER)
+            # Get the video scenes and combine them with timestamps
+            timestamps = ng.get_video_scenes_with_gemini(video_path)
+            combined_segments = ng.process_timestamps(timestamps)
 
-            return jsonify({
-                "message": "Scene changes detected successfully",
-                "descriptions": scene_descriptions_final,
-                "timestamps": timestamps,
-                "scene_files": scene_files,
-            }), 200
-        elif action == "gemini_whole_video":
-            description = describe_with_gemini_whole_video(video_path)
-            video_duration = get_video_duration(video_path)
-            start_time = '00:00:00'
-            end_time = video_duration
-            scene_files = grv.extract_scenes(
-                video_path, [(start_time, end_time)], SCENES_FOLDER)
-            return jsonify({
-                "message": "Scene changes detected successfully",
-                "scene_files": scene_files,
-                "descriptions": [description],
-                "timestamps": [(start_time, end_time)],
-            }), 200
+            # Cut the video by the "NO_TALKING" segments and save them in a folder
+            sceneOutput = ng.cut_video_by_no_talking(video_path, combined_segments, "scenes_results")
 
-        # main pipeline process (gemini_optimized)
-        elif action == "gemini_optimized":
-            print("action: gemini_optimized")
-            detected_scenes = sg.detect_scenes(video_path)
+            # Describe existing segments
+            output = ng.describe_existing_segments("scenes_results", sceneOutput, "audio")
 
-            talking_timestamps = sg.get_talking_timestamps_with_gemini(
-                video_path).strip().splitlines()
-            if (talking_timestamps[0] != "NO_TALKING"):
-                scenes_timestamps = sg.scene_list_to_string_list(
-                    detected_scenes)
-                talking_timestamps = sg.format_talking_timestamps(
-                    talking_timestamps)
-                detected_scenes = sg.combine_speaking_and_scenes(
-                    scenes_timestamps, talking_timestamps)
+            # Format the response data
+            response_data = ng.format_response_data(combined_segments, output)
 
-            scene_descriptions, timestamps, scene_files = sg.describe_scenes_with_gemini_video(
-                video_path, detected_scenes, SCENES_FOLDER)
-            return jsonify({
-                "message": "Scene changes detected successfully",
-                "descriptions": scene_descriptions,
-                "timestamps": timestamps,
-                "scene_files": scene_files,
-                "waveform_image": waveform_image_path
-            }), 200
-
-        elif action == "mock":
-            print("action: gemini_optimized")
-
-            # Mocking scene detection and talking timestamps functionality
-            detected_scenes = [
-                {"start": "00:00:00", "end": "00:00:04"},
-                {"start": "00:00:04", "end": "00:00:16"},
-                {"start": "00:00:16", "end": "00:00:20"},
-                {"start": "00:00:20", "end": "00:00:27"},
-                {"start": "00:00:27", "end": "00:00:30"}
-            ]
-
-            talking_timestamps = ["NO_TALKING"]  # Mock response
-
-            if talking_timestamps[0] != "NO_TALKING":
-                scenes_timestamps = [
-                    f"{scene['start']} - {scene['end']}" for scene in detected_scenes
-                ]
-
-                talking_timestamps = [
-                    "00:00:10 - 00:00:12",
-                    "00:00:18 - 00:00:19"
-                ]  # Mock formatted timestamps
-
-                detected_scenes = [
-                    {
-                        "start": scene.split(' - ')[0],
-                        "end": scene.split(' - ')[1]
-                    } for scene in scenes_timestamps
-                ]
-
-            # Mocking Gemini's scene description and other outputs
-            response_data = {
-                "message": "Scene changes detected successfully",
-                "descriptions": [
-                    "A blue \"Big Buck Bunny\" logo with a white butterfly flies across.\n",
-                    "A pink-hued sky overlooks a tranquil green meadow and forest.\n",
-                    "A serene stream flows through a vibrant, lush meadow.\n",
-                    "A fluffy cartoon bird wakes up, yawns, and flies away.\n",
-                    "A whimsical forest scene shows a cozy burrow beneath a tree.\n"
-                ],
-                "timestamps": [
-                    ["00:00:00", "00:00:04"],
-                    ["00:00:04", "00:00:16"],
-                    ["00:00:16", "00:00:20"],
-                    ["00:00:20", "00:00:27"],
-                    ["00:00:27", "00:00:30"]
-                ],
-                "scene_files": [
-                    "scene_1.mp4",
-                    "scene_2.mp4",
-                    "scene_3.mp4",
-                    "scene_4.mp4",
-                    "scene_5.mp4"
-                ],
-                "waveform_image": "./waveforms/waveform.png"
-            }
-
+            print(response_data)
             return jsonify(response_data), 200
+
         else:
             return jsonify({"error": "Invalid action"}), 400
 
@@ -221,8 +178,8 @@ def process_video():
         print("An error occurred:")
         print(traceback.format_exc())
         return jsonify({"error": str(e)}), 500
-
-
+    
+    
 @app.route("/encode-video-with-subtitles", methods=["POST"])
 def encode_video_with_subtitles():
     data = request.get_json()
@@ -241,34 +198,85 @@ def encode_video_with_subtitles():
         return jsonify({"error": "Video file not found"}), 404
 
     try:
+        # Generate the SRT content from descriptions and timestamps (filter out "TALKING" descriptions)
         srt_content = generate_srt_file(descriptions, timestamps)
         temp_srt_path = os.path.join(tempfile.gettempdir(), "subtitles.srt")
         with open(temp_srt_path, "w") as srt_file:
             srt_file.write(srt_content)
 
-        output_path = os.path.join(
-            PROCESSED_FOLDER, f"processed_{video_file_name}")
+        # Generate the list of audio files corresponding to descriptions that are not "TALKING"
+        audio_files = []
+        for i, description in enumerate(descriptions):
+            if description == "TALKING":
+                continue  # Skip the scene if description is "TALKING"
+            
+            scene_id = i + 1  # Assuming scene ID is just the index (adjust if needed)
+            audio_file_path = os.path.join(AUDIO_FOLDER, f"audio_description_{scene_id}.mp3")
+            
+            if not os.path.exists(audio_file_path):
+                raise FileNotFoundError(f"Audio file for scene_id {scene_id} not found at {audio_file_path}")
+            
+            audio_files.append(audio_file_path)
 
+        if not audio_files:
+            return jsonify({"error": "No valid audio files found to encode with subtitles"}), 400
+
+        # Concatenate the audio files into one audio track
+        temp_audio_path = os.path.join(tempfile.gettempdir(), "combined_audio.mp3")
+        with open(temp_audio_path, 'wb') as combined_audio:
+            for audio_file in audio_files:
+                with open(audio_file, 'rb') as file:
+                    combined_audio.write(file.read())
+
+        # Encode the video with the subtitles and the new audio track
+        output_path = os.path.join(PROCESSED_FOLDER, f"processed_{video_file_name}")
+        
         ffmpeg_command = [
             "ffmpeg",
             "-y",
             "-i", video_path,
+            "-i", temp_audio_path,  # Input the new audio
             "-vf", f"subtitles={temp_srt_path}",
             "-c:v", "libx264",
+            "-c:a", "aac",  # Encoding the audio
             "-preset", "fast",
             "-crf", "23",
+            "-strict", "experimental",  # Required for AAC audio codec
             output_path
         ]
         subprocess.run(ffmpeg_command, check=True)
 
-        return jsonify({
-            "message": "Video encoded with subtitles successfully",
-            "output_video_url": f"/processed/{os.path.basename(output_path)}"
-        }), 200
+        # Return the processed video file
+        return send_file(output_path, as_attachment=True, attachment_filename=os.path.basename(output_path), mimetype='video/mp4')
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+def generate_srt_file(descriptions, timestamps):
+    srt_content = ""
+    for i, (timestamp, description) in enumerate(zip(timestamps, descriptions)):
+        if description == "TALKING":
+            continue  # Skip adding this scene to subtitles if description is "TALKING"
+
+        start_time = timestamp[0]
+        end_time = timestamp[1]
+
+        # Format the times to match SRT format (hh:mm:ss,ms)
+        start_time_str = format_time(start_time)
+        end_time_str = format_time(end_time)
+
+        # Add the subtitle entry
+        srt_content += f"{i + 1}\n{start_time_str} --> {end_time_str}\n{description}\n\n"
+
+    return srt_content
+
+def format_time(seconds):
+    hours = int(seconds // 3600)
+    minutes = int((seconds % 3600) // 60)
+    seconds = seconds % 60
+    milliseconds = int((seconds % 1) * 1000)
+
+    return f"{hours:02}:{minutes:02}:{int(seconds):02},{milliseconds:03}"
 
 @app.route("/processed/<path:filename>", methods=["GET"])
 def get_processed_video(filename):
@@ -277,64 +285,56 @@ def get_processed_video(filename):
     except FileNotFoundError:
         return jsonify({"error": "File not found"}), 404
 
+# @app.route("/text-to-speech", methods=["POST"])
+# def text_to_speech():
+#     # Get the JSON data directly from the request
+#     data = request.get_json()
+    
+#     print(data)
+#     print(type(data))
+
+#     if not data or not isinstance(data, list):
+#         return jsonify({"error": "Descriptions must be provided as a list."}), 400
 
 @app.route("/text-to-speech", methods=["POST"])
 def text_to_speech():
+    # Get the JSON data directly from the request
     data = request.get_json()
-    if not data or "text" not in data:
-        return jsonify({"error": "Invalid input. 'text' is required."}), 400
 
-    text = data["text"]
-
-    try:
-        tts = gTTS(text=text, lang="en")
-        audio_file_path = os.path.join(AUDIO_FOLDER, "output.mp3")
-        tts.save(audio_file_path)
-
-        return send_file(audio_file_path, mimetype="audio/mpeg", as_attachment=False)
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-
-def generate_srt_file(descriptions, timestamps):
-    """Generate SRT file content from descriptions and timestamps."""
-    srt_content = []
-    for i, (description, (start, end)) in enumerate(zip(descriptions, timestamps), start=1):
-        srt_content.append(f"{i}")
-        srt_content.append(f"{start} --> {end}")
-        srt_content.append(description)
-        srt_content.append("")
-    return "\n".join(srt_content)
-
-def generate_waveform(audio_path):
-    """
-    Generate a waveform image from the extracted audio file.
-    Returns the path to the waveform image.
-    """
-    waveform_image_path = os.path.join(WAVEFORM_FOLDER,"waveform.png")
+    if not data or not isinstance(data, list):
+        return jsonify({"error": "Descriptions must be provided as a list."}), 400
 
     try:
-        # Load the audio file
-        y, sr = librosa.load(audio_path, sr=None)
+        audio_files = []
+        for item in data:
+            description = item.get("description")
+            timestamps = item.get("timestamps")
+            scene_id = item.get("scene_id")
 
-        # Create a waveform plot
-        plt.figure(figsize=(14, 5))
-        librosa.display.waveshow(y, sr=sr, alpha=0.8)
-        plt.title("Waveform")
-        plt.xlabel("Time (s)")
-        plt.ylabel("Amplitude")
-        plt.tight_layout()
+            if not description or not timestamps or not scene_id:
+                return jsonify({"error": "Each item must have description, timestamps, and scene_id."}), 400
 
-        # Save the waveform image
-        plt.savefig(waveform_image_path)
-        plt.close()
+            start_time, end_time = timestamps  # Unpack the timestamps
 
-        return waveform_image_path
+            # Use the provided function to convert text to speech for each description
+            audio_file_path = convert_text_to_speech(description, AUDIO_FOLDER, f"audio_description_{scene_id}")
+
+            # Append the description, timestamps, and audio file path to the audio_files list
+            # from the audio file path, strip the leading and trailing whitespaces and the leading dot and slash
+            audio_file_path = audio_file_path.strip()
+            audio_file_path = audio_file_path[2:]
+            print(audio_file_path)
+            audio_files.append({
+                "timestamps": timestamps,
+                "description": description,
+                "audio_file": audio_file_path
+            })
+
+        # Return the generated audio files information in the response
+        return jsonify({"audio_files": audio_files}), 200
 
     except Exception as e:
-        print(f"Error generating waveform: {e}")
-        return None
-
+        return jsonify({"error": f"Failed to process descriptions: {str(e)}"}), 500
 
 if __name__ == "__main__":
     app.run(debug=True)
