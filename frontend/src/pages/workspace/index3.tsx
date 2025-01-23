@@ -1,13 +1,50 @@
 import React, { useState, useEffect } from "react";
-import { Video, Play, Pause, Save } from "lucide-react";
+import { Video, Play, Pause, Save, RefreshCw } from "lucide-react";
 import TranscriptionEditor3 from "src/components/Editor3";
 
 interface VideoDescriptionItem {
-  startTime: string;
-  endTime: string;
+  startTime: number;
+  endTime: number;
   description: string;
   audioFile?: string;
 }
+
+const timestampToMilliseconds = (timestamp: string): number => {
+  const [hours, minutes, secondsWithMs] = timestamp.split(":");
+  const [seconds, milliseconds] = secondsWithMs.split(".");
+
+  const totalMilliseconds =
+    parseInt(hours) * 3600000 +
+    parseInt(minutes) * 60000 +
+    parseInt(seconds) * 1000 +
+    parseInt(milliseconds) * 10;
+  console.log("totalMilliseconds:", totalMilliseconds);
+  return totalMilliseconds;
+};
+
+// Universal timestamp normalization
+const normalizeTimestamp = (timestamp: number | string): string => {
+  // If already a string timestamp, return as-is
+  if (
+    typeof timestamp === "string" &&
+    /^\d{2}:\d{2}:\d{2}\.\d+$/.test(timestamp)
+  ) {
+    return timestamp;
+  }
+
+  // Convert milliseconds to HH:MM:SS.mmm format
+  const totalSeconds = Math.floor(Number(timestamp) / 1000);
+  const hours = Math.floor(totalSeconds / 3600)
+    .toString()
+    .padStart(2, "0");
+  const minutes = Math.floor((totalSeconds % 3600) / 60)
+    .toString()
+    .padStart(2, "0");
+  const seconds = (totalSeconds % 60).toString().padStart(2, "0");
+  const milliseconds = (Number(timestamp) % 1000).toString().padStart(3, "0");
+
+  return `${hours}:${minutes}:${seconds}.${milliseconds}`;
+};
 
 const Workspace3: React.FC = () => {
   const synth = window.speechSynthesis;
@@ -26,6 +63,15 @@ const Workspace3: React.FC = () => {
   >([]);
 
   const action = "new_gemini";
+
+  const reloadPreviousDescriptions = () => {
+    if (previousDescriptions.length > 0) {
+      setVideoDescriptions([...previousDescriptions]);
+      alert("Previous descriptions reloaded successfully!");
+    } else {
+      alert("No previous descriptions available to reload.");
+    }
+  };
 
   // Update combined descriptions when video descriptions change
   useEffect(() => {
@@ -53,8 +99,8 @@ const Workspace3: React.FC = () => {
         const videoDescriptionItems: VideoDescriptionItem[] =
           result.timestamps.map(
             ([startTime, endTime]: [string, string], index: number) => ({
-              startTime,
-              endTime,
+              startTime: timestampToMilliseconds(startTime),
+              endTime: timestampToMilliseconds(endTime),
               description:
                 result.descriptions[index] || "No description available",
               audioFile: result.audio_files[index] || undefined,
@@ -71,135 +117,11 @@ const Workspace3: React.FC = () => {
     }
   };
 
-  // const handleReanalyzeVideo = async (videoName: string): Promise<void> => {
-  //   if (!videoName) {
-  //     alert("No video specified");
-  //     return;
-  //   }
-
-  //   // Prepare timestamps in HH:MM:SS.ms format (only non-TALKING segments)
-  //   const formatTimestamp = (item: VideoDescriptionItem) =>
-  //     `${item.startTime}-${item.endTime}`;
-
-  //   const oldTimestamps = previousDescriptions
-  //     .filter((item) => !item.description.toUpperCase().includes("TALKING"))
-  //     .map(formatTimestamp)
-  //     .join(",");
-
-  //   const newTimestamps = videoDescriptions
-  //     .filter((item) => !item.description.toUpperCase().includes("TALKING"))
-  //     .map(formatTimestamp)
-  //     .join(",");
-
-  //   if (!oldTimestamps || !newTimestamps) {
-  //     alert("No valid timestamps to analyze");
-  //     return;
-  //   }
-
-  //   try {
-  //     const formData = new FormData();
-  //     formData.append("video_name", videoName);
-  //     formData.append("old_timestamps", oldTimestamps);
-  //     formData.append("new_timestamps", newTimestamps);
-
-  //     const response = await fetch("http://localhost:5000/analyze-timestamps", {
-  //       method: "POST",
-  //       body: formData,
-  //     });
-
-  //     if (response.ok) {
-  //       const result = await response.json();
-
-  //       // Create map of changed segments for quick lookup
-  //       const changedMap = new Map();
-  //       result.changed_segments.timestamps.forEach(
-  //         ([start, end]: [string, string], index: number) => {
-  //           changedMap.set(`${start}-${end}`, {
-  //             description: result.changed_segments.descriptions[index],
-  //             audioFile: result.changed_segments.audio_files[index],
-  //           });
-  //         }
-  //       );
-
-  //       // Merge existing descriptions with new data
-  //       const updatedDescriptions: VideoDescriptionItem[] =
-  //         result.full_segments.map(
-  //           (segment: { start: string; end: string }) => {
-  //             const changedData = changedMap.get(
-  //               `${segment.start}-${segment.end}`
-  //             );
-
-  //             // Use changed data if available
-  //             if (changedData) {
-  //               return {
-  //                 startTime: segment.start,
-  //                 endTime: segment.end,
-  //                 description: changedData.description,
-  //                 audioFile: changedData.audioFile,
-  //               };
-  //             }
-
-  //             // Otherwise find in previous descriptions
-  //             const existing = previousDescriptions.find(
-  //               (item) =>
-  //                 item.startTime === segment.start &&
-  //                 item.endTime === segment.end &&
-  //                 !item.description.toUpperCase().includes("TALKING")
-  //             );
-
-  //             return (
-  //               existing || {
-  //                 startTime: segment.start,
-  //                 endTime: segment.end,
-  //                 description: "NO_TALKING",
-  //                 audioFile: undefined,
-  //               }
-  //             );
-  //           }
-  //         );
-
-  //       // Keep existing TALKING segments
-  //       const talkingSegments = videoDescriptions.filter((item) =>
-  //         item.description.toUpperCase().includes("TALKING")
-  //       );
-
-  //       // Combine and sort all segments
-  //       const finalDescriptions = [
-  //         ...talkingSegments,
-  //         ...updatedDescriptions,
-  //       ].sort((a, b) => {
-  //         const aTime = new Date(`1970-01-01T${a.startTime}Z`).getTime();
-  //         const bTime = new Date(`1970-01-01T${b.startTime}Z`).getTime();
-  //         return aTime - bTime;
-  //       });
-
-  //       setVideoDescriptions(finalDescriptions);
-  //       setPreviousDescriptions(finalDescriptions);
-  //       alert("Video reanalyzed successfully!");
-  //     } else {
-  //       const error = await response.json();
-  //       alert(`Error: ${error.error || "Unknown error"}`);
-  //     }
-  //   } catch (error) {
-  //     console.error("Reanalysis error:", error);
-  //     alert("Failed to connect to server");
-  //   }
-  // };
-
   const handleReanalyzeVideo = async (videoName: string): Promise<void> => {
     if (!videoName) {
       alert("No video specified");
       return;
     }
-
-    // Normalization function for timestamps
-    const normalizeTimestamp = (ts: string): string => {
-      const parts = ts.replace(",", ".").split(/[:.]/);
-      const padded = parts.map((p) => p.padStart(2, "0"));
-      return `${padded[0]}:${padded[1]}:${padded[2]}.${
-        padded[3]?.padEnd(3, "0") || "000"
-      }`;
-    };
 
     // Prepare timestamps with normalization
     const formatTimestamp = (item: VideoDescriptionItem) =>
@@ -221,12 +143,11 @@ const Workspace3: React.FC = () => {
       .join(",");
 
     try {
-      // Change the form data key from "new_timestamps" to "new_timestamp"
       const formData = new FormData();
       formData.append("video_name", videoName);
       formData.append("old_data", JSON.stringify(oldData));
-      formData.append("new_timestamp", newTimestamps); // Consistent naming
-      
+      formData.append("new_timestamp", newTimestamps);
+
       const response = await fetch("http://localhost:5000/analyze-timestamps", {
         method: "POST",
         body: formData,
@@ -235,7 +156,6 @@ const Workspace3: React.FC = () => {
       if (response.ok) {
         const result = await response.json();
 
-        // Create map of existing TALKING segments
         const talkingMap = new Map(
           videoDescriptions
             .filter((item) =>
@@ -244,15 +164,10 @@ const Workspace3: React.FC = () => {
             .map((item) => [`${item.startTime}-${item.endTime}`, item])
         );
 
-        // Merge results with existing TALKING segments
         const mergedDescriptions = [
           ...result.descriptions,
           ...Array.from(talkingMap.values()),
-        ].sort(
-          (a, b) =>
-            new Date(`1970-01-01T${a.startTime}`).getTime() -
-            new Date(`1970-01-01T${b.startTime}`).getTime()
-        );
+        ].sort((a, b) => a.startTime - b.startTime);
 
         setVideoDescriptions(mergedDescriptions);
         setPreviousDescriptions(mergedDescriptions);
@@ -268,12 +183,7 @@ const Workspace3: React.FC = () => {
   };
 
   const handleRegenerateAudio = async (): Promise<void> => {
-    console.log("Descriptions:", videoDescriptions);
-
-    // Create a copy of current descriptions to modify
     const updatedDescriptions = [...videoDescriptions];
-
-    // Get indices and items that need regeneration
     const regenerationIndices: number[] = [];
     const regenerationPayload: any[] = [];
 
@@ -282,7 +192,7 @@ const Workspace3: React.FC = () => {
         regenerationIndices.push(index);
         regenerationPayload.push({
           description: item.description,
-          timestamps: [parseFloat(item.startTime), parseFloat(item.endTime)],
+          timestamps: [Number(item.startTime), Number(item.endTime)],
           scene_id: item.startTime,
         });
       }
@@ -464,6 +374,16 @@ const Workspace3: React.FC = () => {
           handleReanalyzeVideo={handleReanalyzeVideo}
           handleRegenerateAudio={handleRegenerateAudio}
         />
+        {/* Add a reload button */}
+        <div className="fixed bottom-4 right-4">
+          <button
+            onClick={reloadPreviousDescriptions}
+            className="p-3 bg-blue-600 text-white rounded-full shadow-lg hover:bg-blue-700 transition-all"
+            title="Reload previous descriptions"
+          >
+            <RefreshCw className="w-6 h-6" />
+          </button>
+        </div>
       </main>
     </div>
   );

@@ -13,8 +13,8 @@ interface TimelineVisualizerProps {
 }
 
 interface VideoDescriptionItem {
-  startTime: string;
-  endTime: string;
+  startTime: number;
+  endTime: number;
   description: string;
   audioFile?: string;
 }
@@ -29,8 +29,8 @@ interface TimelineElement {
   text: string;
   position: number;
   width: number;
-  startTime: string;
-  endTime: string;
+  startTime: number;
+  endTime: number;
 }
 
 interface ContainerElement {
@@ -57,64 +57,23 @@ const TimelineVisualizer: React.FC<TimelineVisualizerProps> = ({
   const [isDragging, setIsDragging] = useState(false);
   const resizingRef = useRef(false);
   const audioRef = useRef<{ [key: string]: HTMLAudioElement | null }>({});
-  const [volume, setVolume] = useState(1); // State to store the volume level
+  const [volume, setVolume] = useState(1);
   const [scrollPosition, setScrollPosition] = useState(0);
   const [containerWidth, setContainerWidth] = useState(0);
   const [audioDurations, setAudioDurations] = useState<AudioDurations>({});
 
-  // setTimelineWidth(videoduration * 100);
-
-  // const timeToPixels = (timeStr: string): number => {
-  //   const [hours = "0", minutes = "0", seconds = "0"] = timeStr.split(":");
-  //   const totalSeconds =
-  //     parseInt(hours) * 3600 + parseInt(minutes) * 60 + parseFloat(seconds);
-  //   return totalSeconds * 100;
-  // };
-
-  // const pixelsToTime = (pixels: number): string => {
-  //   const totalSeconds = pixels / 100;
-  //   const hours = Math.floor(totalSeconds / 3600);
-  //   const minutes = Math.floor((totalSeconds % 3600) / 60);
-  //   const seconds = (totalSeconds % 60).toFixed(3);
-  //   return `${hours}:${minutes.toString().padStart(2, "0")}:${seconds.padStart(
-  //     6,
-  //     "0"
-  //   )}`;
-  // };
   const pixelsToTime = (pixels: number): string => {
-    const totalSeconds = pixels / 100;
-    const hours = Math.floor(totalSeconds / 3600);
-    const minutes = Math.floor((totalSeconds % 3600) / 60);
-    const seconds = (totalSeconds % 60).toFixed(2); // Ensures 2 decimal places for fractional seconds
+    const totalMs = pixels * 10; // 1 pixel = 10ms
+    const hours = Math.floor(totalMs / 3600000);
+    const minutes = Math.floor((totalMs % 3600000) / 60000);
+    const seconds = Math.floor((totalMs % 60000) / 1000);
+    const milliseconds = totalMs % 1000;
 
-    // Pad hours, minutes, and seconds to ensure consistent formatting
     return `${hours.toString().padStart(2, "0")}:${minutes
       .toString()
-      .padStart(2, "0")}:${seconds.padStart(5, "0")}`;
-  };
-
-  const timeToPixels = (timeStr: string): number => {
-    // Check if the timestamp is in the format hhmmSSss (e.g., 000279 for 00:02.79)
-    if (/^\d{6}(\.\d+)?$/.test(timeStr)) {
-      const hours = parseInt(timeStr.slice(0, 2), 10);
-      const minutes = parseInt(timeStr.slice(2, 4), 10);
-      const seconds = parseFloat(timeStr.slice(4)); // Handles fractional seconds
-      const totalSeconds = hours * 3600 + minutes * 60 + seconds;
-      return totalSeconds * 100;
-    }
-
-    // Check if the timestamp is in the format HH:mm:ss.ss or HH:MM:SS.sss
-    if (/^(\d{1,2}):(\d{1,2}):(\d{1,2}(?:\.\d+)?)$/.test(timeStr)) {
-      const [hours = "0", minutes = "0", seconds = "0"] = timeStr.split(":");
-      const totalSeconds =
-        parseInt(hours) * 3600 + parseInt(minutes) * 60 + parseFloat(seconds);
-      return totalSeconds * 100;
-    }
-
-    // If neither format matches, throw an error
-    throw new Error(
-      `Invalid timestamp format: ${timeStr}. Expected formats: HH:mm:ss.ss, HH:MM:SS.sss, or hhmmSSss`
-    );
+      .padStart(2, "0")}:${seconds.toString().padStart(2, "0")}.${milliseconds
+      .toString()
+      .padStart(3, "0")}`;
   };
 
   useEffect(() => {
@@ -128,7 +87,7 @@ const TimelineVisualizer: React.FC<TimelineVisualizerProps> = ({
     window.addEventListener("resize", updateContainerSize);
     return () => window.removeEventListener("resize", updateContainerSize);
   }, []);
-  // Function to update the volume of all audio elements
+
   const updateAudioVolume = (newVolume: number) => {
     setVolume(newVolume);
     Object.values(audioRef.current).forEach((audio) => {
@@ -138,7 +97,6 @@ const TimelineVisualizer: React.FC<TimelineVisualizerProps> = ({
     });
   };
 
-  // Add the volume control slider
   const handleVolumeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newVolume = parseFloat(e.target.value);
     updateAudioVolume(newVolume);
@@ -148,13 +106,60 @@ const TimelineVisualizer: React.FC<TimelineVisualizerProps> = ({
     updateAudioVolume(audioVolume);
   }, [audioVolume]);
 
+  // const updateContainers = (updatedElements: TimelineElement[]) => {
+  //   const sortedElements = [...updatedElements].sort(
+  //     (a, b) => a.position - b.position
+  //   );
+
+  //   const newContainers = sortedElements.map((element, index) => {
+  //     if (element.text === "TALKING") {
+  //       return {
+  //         id: element.id,
+  //         startPosition: element.position,
+  //         width: element.width,
+  //         element: element,
+  //       };
+  //     }
+
+  //     const previousElement =
+  //       index > 0 && sortedElements[index - 1].text !== "TALKING"
+  //         ? sortedElements[index - 1]
+  //         : null;
+
+  //     const containerStart =
+  //       previousElement && previousElement.text !== "TALKING"
+  //         ? previousElement.position + previousElement.width
+  //         : element.position;
+
+  //     const nextElement =
+  //       index < sortedElements.length - 1 &&
+  //       sortedElements[index + 1].text !== "TALKING"
+  //         ? sortedElements[index + 1]
+  //         : null;
+
+  //     const containerWidth = nextElement
+  //       ? nextElement.position - containerStart
+  //       : timelineWidth - containerStart;
+
+  //     return {
+  //       id: element.id,
+  //       startPosition: containerStart,
+  //       width: containerWidth,
+  //       element: element,
+  //     };
+  //   });
+
+  //   setContainers(newContainers);
+  // };
+
   const updateContainers = (updatedElements: TimelineElement[]) => {
     const sortedElements = [...updatedElements].sort(
       (a, b) => a.position - b.position
     );
-
+  
     const newContainers = sortedElements.map((element, index) => {
       if (element.text === "TALKING") {
+        // TALKING elements are fixed and act as boundaries
         return {
           id: element.id,
           startPosition: element.position,
@@ -162,27 +167,29 @@ const TimelineVisualizer: React.FC<TimelineVisualizerProps> = ({
           element: element,
         };
       }
-
-      const previousElement =
-        index > 0 && sortedElements[index - 1].text !== "TALKING"
-          ? sortedElements[index - 1]
-          : null;
-
-      const containerStart =
-        previousElement && previousElement.text !== "TALKING"
-          ? previousElement.position + previousElement.width
-          : element.position;
-
-      const nextElement =
-        index < sortedElements.length - 1 &&
-        sortedElements[index + 1].text !== "TALKING"
-          ? sortedElements[index + 1]
-          : null;
-
-      const containerWidth = nextElement
-        ? nextElement.position - containerStart
-        : timelineWidth - containerStart;
-
+  
+      // Find the previous boundary (end position of the previous element)
+      let prevBoundary = 0; // Default to 0 if no previous element exists
+      for (let i = index - 1; i >= 0; i--) {
+        const prevElement = sortedElements[i];
+        // Use the end position of the previous element as the boundary
+        prevBoundary = prevElement.position + prevElement.width;
+        break; // Stop after finding the first previous element
+      }
+  
+      // Find the next boundary (start position of the next element)
+      let nextBoundary = timelineWidth; // Default to timeline width if no next element exists
+      for (let i = index + 1; i < sortedElements.length; i++) {
+        const nextElement = sortedElements[i];
+        // Use the start position of the next element as the boundary
+        nextBoundary = nextElement.position;
+        break; // Stop after finding the first next element
+      }
+  
+      // Calculate the container start and width
+      const containerStart = Math.min(prevBoundary, element.position); // Ensure the container doesn't overlap with the previous element
+      const containerWidth = nextBoundary - containerStart; // Ensure the container doesn't overlap with the next element
+  
       return {
         id: element.id,
         startPosition: containerStart,
@@ -190,7 +197,7 @@ const TimelineVisualizer: React.FC<TimelineVisualizerProps> = ({
         element: element,
       };
     });
-
+  
     setContainers(newContainers);
   };
 
@@ -210,24 +217,23 @@ const TimelineVisualizer: React.FC<TimelineVisualizerProps> = ({
         const audio = audioRef.current[element.id];
         if (audio) {
           audio.src = `http://localhost:5000/${updatedElement.audioFile}`;
-          audio.load(); // Load the new audio file
-          element.audioFile = updatedElement.audioFile; // Update the element's audioFile reference
+          audio.load();
+          element.audioFile = updatedElement.audioFile;
         }
       }
     });
   }, [videoDescriptions, elements]);
-  // Add new scene functionality
+
   const addNewScene = () => {
     const currentPosition = currentTime * 100;
 
-    // Create the new scene
     const newSceneElement: TimelineElement = {
-      id: 0, // Temporary ID, will be reassigned after sorting
+      id: 0,
       text: "New Scene",
       position: currentPosition,
-      width: 100, // Default width
-      startTime: pixelsToTime(currentPosition),
-      endTime: pixelsToTime(currentPosition + 100),
+      width: 100,
+      startTime: currentTime,
+      endTime: currentTime + 1,
       audioFile: undefined,
     };
 
@@ -236,18 +242,16 @@ const TimelineVisualizer: React.FC<TimelineVisualizerProps> = ({
         (a, b) => a.position - b.position
       );
 
-      // Reassign IDs based on new order
       const reassignedElements = updatedElements.map((el, index) => ({
         ...el,
-        id: index + 1, // IDs start from 1
+        id: index + 1,
       }));
 
-      // Update video descriptions in the correct order
       const updatedDescriptions = reassignedElements.map((el) => ({
         startTime: el.startTime,
         endTime: el.endTime,
         description: el.text,
-        videoUrl: "", // Default or placeholder URL
+        videoUrl: "",
       }));
 
       onDescriptionChange(updatedDescriptions);
@@ -256,31 +260,16 @@ const TimelineVisualizer: React.FC<TimelineVisualizerProps> = ({
     });
   };
 
-  // Handle elements and containers based on video descriptions
-  // useEffect(() => {
-  //   if (videoDescriptions.length > 0) {
-  //     const maxEndTime = Math.max(
-  //       ...videoDescriptions.map((desc) => timeToPixels(desc.endTime))
-  //     );
-  //     setTimelineWidth(maxEndTime);
-  //   } else {
-  //     setTimelineWidth(window.innerWidth);
-  //   }
-  // }, [videoDescriptions]);
-
   useEffect(() => {
     setTimelineWidth(videoduration * 100);
   }, [videoduration]);
 
-  // Update elements and containers when video descriptions or timeline width changes
   useEffect(() => {
-    if (videoDescriptions.length === 0) return;
-
     const newElements = videoDescriptions.map((desc, index) => ({
       id: index + 1,
       text: desc.description,
-      position: timeToPixels(desc.startTime),
-      width: timeToPixels(desc.endTime) - timeToPixels(desc.startTime),
+      position: desc.startTime / 10, // Convert ms to pixels (1px = 10ms)
+      width: (desc.endTime - desc.startTime) / 10, // Convert duration in ms to pixels
       startTime: desc.startTime,
       endTime: desc.endTime,
       audioFile: desc.audioFile || undefined,
@@ -290,16 +279,16 @@ const TimelineVisualizer: React.FC<TimelineVisualizerProps> = ({
     updateContainers(newElements);
   }, [videoDescriptions, timelineWidth]);
 
-  // Handle drag stop to update elements
   const handleDragStop = (elementId: number, newPosition: number) => {
     if (resizingRef.current) return;
     setIsDragging(false);
 
     const newElements = elements.map((el) => {
       if (el.id === elementId) {
-        const newStartTime = pixelsToTime(newPosition);
+        const newStartTime = newPosition * 10; // Convert pixels to ms
         const endPosition = newPosition + el.width;
-        const newEndTime = pixelsToTime(endPosition);
+        const newEndTime = endPosition * 10; // Convert pixels to ms
+
         return {
           ...el,
           position: newPosition,
@@ -323,7 +312,6 @@ const TimelineVisualizer: React.FC<TimelineVisualizerProps> = ({
     onDescriptionChange(updatedDescriptions);
   };
 
-  // Handle resize for elements
   const handleResize = (elementId: number, delta: number) => {
     if (isDragging) return;
 
@@ -346,7 +334,7 @@ const TimelineVisualizer: React.FC<TimelineVisualizerProps> = ({
 
       const newElements = prevElements.map((el) => {
         if (el.id === elementId) {
-          const newEndTime = pixelsToTime(el.position + newWidth);
+          const newEndTime = (el.position + newWidth) * 10; // Convert pixels to ms
           return { ...el, width: newWidth, endTime: newEndTime };
         }
         return el;
@@ -367,17 +355,6 @@ const TimelineVisualizer: React.FC<TimelineVisualizerProps> = ({
     });
   };
 
-  // const handleTimelineClick = (e: React.MouseEvent<HTMLDivElement>) => {
-  //   if (!timelineRef.current || !onTimeUpdate) return;
-
-  //   const rect = timelineRef.current.getBoundingClientRect();
-  //   const scrollLeft = timelineRef.current.scrollLeft;
-  //   const x = e.clientX - rect.left + scrollLeft;
-
-  //   const newTime = x / 100;
-  //   onTimeUpdate(newTime);
-  // };
-
   const handleTimelineClick = (e: React.MouseEvent<HTMLDivElement>) => {
     if (!timelineRef.current || !onTimeUpdate) return;
 
@@ -387,10 +364,9 @@ const TimelineVisualizer: React.FC<TimelineVisualizerProps> = ({
 
     const newTime = x / 100;
 
-    // Check if the new time is above a draggable element
     for (const container of containers) {
-      const startSeconds = timeToPixels(container.element.startTime) / 100;
-      const endSeconds = timeToPixels(container.element.endTime) / 100;
+      const startSeconds = container.element.startTime;
+      const endSeconds = container.element.endTime;
 
       if (newTime >= startSeconds && newTime < endSeconds) {
         const audio = audioRef.current[container.id];
@@ -398,7 +374,6 @@ const TimelineVisualizer: React.FC<TimelineVisualizerProps> = ({
           const audioOffset = newTime - startSeconds;
           if (audioOffset < audio.duration) {
             audio.currentTime = audioOffset;
-            console.log(`Audio for ID ${container.id} set to ${audioOffset}`);
           } else {
             console.warn(
               `Audio offset (${audioOffset}) exceeds duration (${audio.duration})`
@@ -409,52 +384,16 @@ const TimelineVisualizer: React.FC<TimelineVisualizerProps> = ({
       }
     }
 
-    // Update the timeline's current time
     onTimeUpdate(newTime);
   };
-
-  // useEffect(() => {
-  //   containers.forEach(({ id, element }) => {
-  //     const audio = audioRef.current[id];
-  //     if (!audio || !element.audioFile) return;
-
-  //     const startSeconds = timeToPixels(element.startTime) / 100;
-  //     const endSeconds = timeToPixels(element.endTime) / 100;
-
-  //     if (currentTime >= startSeconds && currentTime < endSeconds) {
-  //       console.log("currentTime", audio.currentTime);
-  //       let audioOffset = currentTime - startSeconds;
-  //       audioOffset = Number(audioOffset.toFixed(6)); // Limit to 6 decimal places
-  //       console.log("audioOffset", audioOffset);
-  //       // audio.currentTime = audioOffset;
-
-  //       // Rest of the code remains the same
-  //       if (isPlaying && audio.paused) {
-  //         console.log(
-  //           `Playing audio for ID: ${id}, File: ${element.audioFile}`
-  //         );
-  //         audio
-  //           .play()
-  //           .catch((error) => console.error("Audio playback error:", error));
-  //       } else if (!isPlaying && !audio.paused) {
-  //         console.log(
-  //           `Pausing audio for ID: ${id}, File: ${element.audioFile}`
-  //         );
-  //         audio.pause();
-  //       }
-  //     } else {
-  //       audio.pause();
-  //     }
-  //   });
-  // }, [currentTime, containers, isPlaying]);
 
   useEffect(() => {
     elements.forEach((element) => {
       const audio = audioRef.current[element.id];
       if (!audio || !element.audioFile) return;
 
-      const elementStartTime = element.position / 100;
-      const elementEndTime = (element.position + element.width) / 100;
+      const elementStartTime = element.startTime;
+      const elementEndTime = element.endTime;
 
       if (currentTime >= elementStartTime && currentTime < elementEndTime) {
         const audioOffset = currentTime - elementStartTime;
@@ -483,7 +422,6 @@ const TimelineVisualizer: React.FC<TimelineVisualizerProps> = ({
     });
   }, [currentTime, elements, isPlaying]);
 
-  // Add this callback for audio metadata
   const handleAudioMetadata = (id: number, duration: number) => {
     setAudioDurations((prev) => ({ ...prev, [id]: duration }));
   };

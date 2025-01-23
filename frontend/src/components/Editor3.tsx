@@ -4,8 +4,8 @@ import TimelineVisualizer from "./Timeline2";
 import TimelineVisualizer2 from "./Timeline2";
 
 interface VideoDescriptionItem {
-  startTime: string;
-  endTime: string;
+  startTime: number;
+  endTime: number;
   description: string;
   audioFile?: string;
 }
@@ -42,7 +42,7 @@ const TranscriptionEditor3: React.FC<VideoTimelineProps> = ({
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const animationRef = useRef<number | null>(null);
-  const [selectedScene, setSelectedScene] = useState<string | null>(null);
+  const [selectedScene, setSelectedScene] = useState<number | null>(null);
   const [currentSubtitle, setCurrentSubtitle] = useState<string>("");
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [videoFile, setVideoFile] = useState<File | null>(null);
@@ -64,21 +64,16 @@ const TranscriptionEditor3: React.FC<VideoTimelineProps> = ({
   }, [audioVolume]);
 
   useEffect(() => {
-    // if (videoDescriptions.length === 0) return;
-
-    // console.log(videoDescriptions);
+    console.log("currentTime:", currentTime);
+    console.log("videoDescriptions:", videoDescriptions);
     const currentTimeInSeconds = currentTime;
-    const currentScene = videoDescriptions.find((scene) => {
-      const startTime = convertTimestampToSeconds(scene.startTime);
-      const endTime = convertTimestampToSeconds(scene.endTime);
-      return (
-        currentTimeInSeconds >= startTime && currentTimeInSeconds <= endTime
-      );
-    });
-
+    const currentScene = videoDescriptions.find(
+      (scene) =>
+        currentTimeInSeconds >= scene.startTime / 1000 &&
+        currentTimeInSeconds <= scene.endTime / 1000
+    );
     setCurrentSubtitle(currentScene?.description || "");
   }, [currentTime, videoDescriptions]);
-
   useEffect(() => {
     if (uploadedVideo) {
       const url = URL.createObjectURL(uploadedVideo);
@@ -117,7 +112,6 @@ const TranscriptionEditor3: React.FC<VideoTimelineProps> = ({
   const handleLoadedMetadata = (): void => {
     if (videoRef.current) {
       setVideoDuration(videoRef.current.duration);
-      console.log("Video Duration:", videoRef.current.duration);
     }
   };
 
@@ -145,7 +139,7 @@ const TranscriptionEditor3: React.FC<VideoTimelineProps> = ({
     }
   };
 
-  const updateSceneText = (sceneStartTime: string, newText: string): void => {
+  const updateSceneText = (sceneStartTime: number, newText: string): void => {
     const updatedDescriptions = videoDescriptions.map((scene) =>
       scene.startTime === sceneStartTime
         ? { ...scene, description: newText }
@@ -222,9 +216,6 @@ const TranscriptionEditor3: React.FC<VideoTimelineProps> = ({
 
       <div className="grid grid-cols-10 grid-rows-10 h-full">
         <div className="col-span-5 row-span-7 p-4 bg-white shadow-md overflow-y-auto">
-          <div className="mb-4">
-            <span className="font-bold text-xl">Transcription</span>
-          </div>
           <div>
             {videoDescriptions
               .filter((scene) => scene.description !== "TALKING")
@@ -239,9 +230,9 @@ const TranscriptionEditor3: React.FC<VideoTimelineProps> = ({
                   onClick={() => setSelectedScene(scene.startTime)}
                 >
                   <div>
-                    {`Scene ${index + 1}: ${scene.startTime} - ${
-                      scene.endTime
-                    }`}
+                    {`Scene ${index + 1}: ${(scene.startTime / 1000).toFixed(
+                      3
+                    )}s - ${(scene.endTime / 1000).toFixed(3)}s`}
                   </div>
                   <textarea
                     className="w-full border border-gray-300 rounded p-1 mt-1"
@@ -388,9 +379,9 @@ const TranscriptionEditor3: React.FC<VideoTimelineProps> = ({
         <div className="col-span-10 row-span-2 p-4 bg-white shadow-md">
           <TimelineVisualizer2
             videoDescriptions={videoDescriptions}
-            currentTime={currentTime}
+            currentTime={currentTime} // Convert to milliseconds
             onDescriptionChange={onDescriptionChange}
-            onTimeUpdate={handleTimelineUpdate}
+            onTimeUpdate={(ms) => handleTimelineUpdate(ms)} // Convert to seconds
             visualizer={<div></div>}
             isPlaying={isPlaying}
             videoduration={videoDuration}
@@ -413,12 +404,10 @@ const TranscriptionEditor3: React.FC<VideoTimelineProps> = ({
 const convertTimestampToSeconds = (timestamp: string): number => {
   // Check if the timestamp is in the format hhmmSSss (e.g., 000279 for 00:02.79)
   if (/^\d{6}(\.\d+)?$/.test(timestamp)) {
-    // Extract hours, minutes, seconds, and fractional seconds
     const hours = parseInt(timestamp.slice(0, 2), 10);
     const minutes = parseInt(timestamp.slice(2, 4), 10);
     const seconds = parseFloat(timestamp.slice(4)); // Handles fractional seconds
 
-    // Validate minutes and seconds
     if (minutes < 0 || minutes >= 60) {
       throw new Error(
         `Invalid minutes value: ${minutes}. Must be between 0 and 59.`
@@ -440,7 +429,6 @@ const convertTimestampToSeconds = (timestamp: string): number => {
     const minutes = parseInt(parts[1], 10);
     const seconds = parseFloat(parts[2]); // Handles fractional seconds
 
-    // Validate minutes and seconds
     if (minutes < 0 || minutes >= 60) {
       throw new Error(
         `Invalid minutes value: ${minutes}. Must be between 0 and 59.`
