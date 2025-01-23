@@ -7,7 +7,6 @@ import LandingPage from "./pages/landingPage";
 import { WorkSpace } from "./pages/workspace/index";
 import reportWebVitals from "./reportWebVitals";
 import App from "./App";
-import LandingPage from "./LandingPage";
 import FAQPage from "./FAQPage";
 
 
