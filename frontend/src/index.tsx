@@ -7,7 +7,7 @@ import LandingPage from "./pages/landingPage";
 import { WorkSpace } from "./pages/workspace/index";
 import reportWebVitals from "./reportWebVitals";
 import App from "./App";
-import FAQPage from "./FAQPage";
+import FAQ from "./pages/faq/index";
 
 
 const root = ReactDOM.createRoot(
@@ -21,7 +21,7 @@ root.render(
         <Route path="workspace" element={<WorkSpace />} />
         <Route path="dashboard" element={<Dashboard />} />
         <Route path="main" element={<App />} />
-        <Route path="faq" element={<FAQPage />} />
+        <Route path="faq" element={<FAQ />} />
       </Routes>
     </BrowserRouter>
   </React.StrictMode>

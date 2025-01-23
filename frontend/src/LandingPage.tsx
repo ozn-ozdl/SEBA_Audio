@@ -20,12 +20,6 @@ const LandingPage: React.FC = () => {
         >
           Get Started
         </Button>
-        <Button
-          className="bg-white text-indigo-900 px-8 py-4 rounded-lg shadow-lg hover:bg-gray-200 transition duration-300 text-lg font-semibold mt-4"
-          onClick={() => (window.location.href = "/faq")}
-        >
-          Frequently Asked Questions
-        </Button>
       </section>
 
       {/* Demo Section */}
