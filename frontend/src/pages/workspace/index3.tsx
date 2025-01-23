@@ -1,7 +1,5 @@
 import React, { useState, useEffect } from "react";
 import { Video, Play, Pause, Save } from "lucide-react";
-import TranscriptionEditor2 from "src/components/Editor2";
-import { useLocalStorage } from "@uidotdev/usehooks";
 import TranscriptionEditor3 from "src/components/Editor3";
 
 interface VideoDescriptionItem {
@@ -23,92 +21,21 @@ const Workspace3: React.FC = () => {
   const [combinedDescriptions, setCombinedDescriptions] = useState("");
   const [speechActive, setSpeechActive] = useState(false);
   const [audio, setAudio] = useState<HTMLAudioElement | null>(null);
-  const [videoDescriptionsStorage, setVideoDescriptionsStorage] =
-    useLocalStorage<
-      {
-        name: string;
-        data: VideoDescriptionItem[];
-        date: string;
-      }[]
-    >("video_descriptions", []);
+  const [previousDescriptions, setPreviousDescriptions] = useState<
+    VideoDescriptionItem[]
+  >([]);
 
   const action = "new_gemini";
 
   // Update combined descriptions when video descriptions change
   useEffect(() => {
-    const descriptionsArray = videoDescriptions.map((item) => item.description);
-    const combinedText = descriptionsArray.join(" ");
-    setCombinedDescriptions(combinedText);
+    const newCombinedText = videoDescriptions
+      .map((item) => item.description)
+      .join(" ");
+    if (newCombinedText !== combinedDescriptions) {
+      setCombinedDescriptions(newCombinedText);
+    }
   }, [videoDescriptions]);
-
-  // Load video descriptions from local storage
-  useEffect(() => {
-    if (videoDescriptionsStorage) {
-      const currentDetail = videoDescriptionsStorage.find(
-        (item) => item.name === name
-      );
-      if (currentDetail) {
-        setVideoDescriptions(currentDetail.data);
-      }
-    }
-  }, [videoDescriptionsStorage, name]);
-
-  // Compare timestamps and send only the changed ones
-  const compareTimestamps = (
-    oldTimestamps: VideoDescriptionItem[],
-    newTimestamps: VideoDescriptionItem[]
-  ) => {
-    const modifiedItems = [];
-    for (let i = 0; i < newTimestamps.length; i++) {
-      if (
-        oldTimestamps[i] &&
-        (oldTimestamps[i].startTime !== newTimestamps[i].startTime ||
-          oldTimestamps[i].endTime !== newTimestamps[i].endTime)
-      ) {
-        modifiedItems.push(newTimestamps[i]);
-      }
-    }
-    return modifiedItems;
-  };
-
-  const reprocessDescriptions = async (
-    modifiedDescriptions: VideoDescriptionItem[]
-  ) => {
-    try {
-      const response = await fetch("http://localhost:5000/reanalyze-video", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          video_filename: uploadedVideo?.name,
-          timestamps: modifiedDescriptions.map((item) => [
-            item.startTime,
-            item.endTime,
-          ]),
-        }),
-      });
-
-      if (response.ok) {
-        const result = await response.json();
-
-        // Update state with the newly reprocessed descriptions
-        setVideoDescriptions(
-          result.data.map((item: any) => ({
-            startTime: item.timestamp[0],
-            endTime: item.timestamp[1],
-            description: item.description,
-            videoUrl: `http://localhost:5000/scene_files/${item.scene_id}.mp4`,
-            audioFile: item.audio_file,
-          }))
-        );
-      } else {
-        alert("Error reprocessing descriptions");
-      }
-    } catch (error) {
-      alert("Error connecting to backend");
-    }
-  };
 
   const handleProcessVideo = async (videoFile: File, action: string) => {
     const formData = new FormData();
@@ -123,7 +50,6 @@ const Workspace3: React.FC = () => {
 
       if (response.ok) {
         const result = await response.json();
-
         const videoDescriptionItems: VideoDescriptionItem[] =
           result.timestamps.map(
             ([startTime, endTime]: [string, string], index: number) => ({
@@ -134,10 +60,9 @@ const Workspace3: React.FC = () => {
               audioFile: result.audio_files[index] || undefined,
             })
           );
-
+        setPreviousDescriptions(videoDescriptionItems);
         setVideoDescriptions(videoDescriptionItems);
         console.log("Video Description Items:", videoDescriptionItems);
-        // Do something with videoDescriptionItems, e.g., display in UI
       } else {
         alert("Error processing video");
       }
@@ -146,109 +71,266 @@ const Workspace3: React.FC = () => {
     }
   };
 
-  // const handleProcessVideo = async (videoFile: File, action: string) => {
-  //   if (!action) {
-  //     alert("Please select an action");
+  // const handleReanalyzeVideo = async (videoName: string): Promise<void> => {
+  //   if (!videoName) {
+  //     alert("No video specified");
   //     return;
   //   }
 
-  //   const formData = new FormData();
-  //   formData.append("action", action);
-  //   formData.append("video", videoFile);
-  //   console.log(formData);
+  //   // Prepare timestamps in HH:MM:SS.ms format (only non-TALKING segments)
+  //   const formatTimestamp = (item: VideoDescriptionItem) =>
+  //     `${item.startTime}-${item.endTime}`;
+
+  //   const oldTimestamps = previousDescriptions
+  //     .filter((item) => !item.description.toUpperCase().includes("TALKING"))
+  //     .map(formatTimestamp)
+  //     .join(",");
+
+  //   const newTimestamps = videoDescriptions
+  //     .filter((item) => !item.description.toUpperCase().includes("TALKING"))
+  //     .map(formatTimestamp)
+  //     .join(",");
+
+  //   if (!oldTimestamps || !newTimestamps) {
+  //     alert("No valid timestamps to analyze");
+  //     return;
+  //   }
+
   //   try {
-  //     const response = await fetch("http://localhost:5000/process-video", {
+  //     const formData = new FormData();
+  //     formData.append("video_name", videoName);
+  //     formData.append("old_timestamps", oldTimestamps);
+  //     formData.append("new_timestamps", newTimestamps);
+
+  //     const response = await fetch("http://localhost:5000/analyze-timestamps", {
   //       method: "POST",
   //       body: formData,
   //     });
 
   //     if (response.ok) {
   //       const result = await response.json();
-  //       const processedDescriptions = result.data.map((item: any) => ({
-  //         startTime: item.timestamp[0],
-  //         endTime: item.timestamp[1],
-  //         description: item.description,
-  //         videoUrl: `http://localhost:5000/scene_files/${item.scene_id}.mp4`,
-  //         audioFile: item.audio_file,
-  //       }));
-  //       console.log("processedDescriptions", processedDescriptions);
-  //       setVideoDescriptions(processedDescriptions);
+
+  //       // Create map of changed segments for quick lookup
+  //       const changedMap = new Map();
+  //       result.changed_segments.timestamps.forEach(
+  //         ([start, end]: [string, string], index: number) => {
+  //           changedMap.set(`${start}-${end}`, {
+  //             description: result.changed_segments.descriptions[index],
+  //             audioFile: result.changed_segments.audio_files[index],
+  //           });
+  //         }
+  //       );
+
+  //       // Merge existing descriptions with new data
+  //       const updatedDescriptions: VideoDescriptionItem[] =
+  //         result.full_segments.map(
+  //           (segment: { start: string; end: string }) => {
+  //             const changedData = changedMap.get(
+  //               `${segment.start}-${segment.end}`
+  //             );
+
+  //             // Use changed data if available
+  //             if (changedData) {
+  //               return {
+  //                 startTime: segment.start,
+  //                 endTime: segment.end,
+  //                 description: changedData.description,
+  //                 audioFile: changedData.audioFile,
+  //               };
+  //             }
+
+  //             // Otherwise find in previous descriptions
+  //             const existing = previousDescriptions.find(
+  //               (item) =>
+  //                 item.startTime === segment.start &&
+  //                 item.endTime === segment.end &&
+  //                 !item.description.toUpperCase().includes("TALKING")
+  //             );
+
+  //             return (
+  //               existing || {
+  //                 startTime: segment.start,
+  //                 endTime: segment.end,
+  //                 description: "NO_TALKING",
+  //                 audioFile: undefined,
+  //               }
+  //             );
+  //           }
+  //         );
+
+  //       // Keep existing TALKING segments
+  //       const talkingSegments = videoDescriptions.filter((item) =>
+  //         item.description.toUpperCase().includes("TALKING")
+  //       );
+
+  //       // Combine and sort all segments
+  //       const finalDescriptions = [
+  //         ...talkingSegments,
+  //         ...updatedDescriptions,
+  //       ].sort((a, b) => {
+  //         const aTime = new Date(`1970-01-01T${a.startTime}Z`).getTime();
+  //         const bTime = new Date(`1970-01-01T${b.startTime}Z`).getTime();
+  //         return aTime - bTime;
+  //       });
+
+  //       setVideoDescriptions(finalDescriptions);
+  //       setPreviousDescriptions(finalDescriptions);
+  //       alert("Video reanalyzed successfully!");
   //     } else {
-  //       alert("Error processing video");
+  //       const error = await response.json();
+  //       alert(`Error: ${error.error || "Unknown error"}`);
   //     }
   //   } catch (error) {
-  //     alert("Error connecting to backend");
+  //     console.error("Reanalysis error:", error);
+  //     alert("Failed to connect to server");
   //   }
   // };
 
-  // console.log(videoDescriptions);
-  const handleAnalyzeVideo = async (): Promise<void> => {
-    // Placeholder for actual analysis function
-    alert("Analyzing video...");
-  };
+  const handleReanalyzeVideo = async (videoName: string): Promise<void> => {
+    if (!videoName) {
+      alert("No video specified");
+      return;
+    }
 
-  const handleReanalyzeVideo = async (): Promise<void> => {
-    // Placeholder for reanalyzing video
-    alert("Reanalyzing video...");
-  };
+    // Normalization function for timestamps
+    const normalizeTimestamp = (ts: string): string => {
+      const parts = ts.replace(",", ".").split(/[:.]/);
+      const padded = parts.map((p) => p.padStart(2, "0"));
+      return `${padded[0]}:${padded[1]}:${padded[2]}.${
+        padded[3]?.padEnd(3, "0") || "000"
+      }`;
+    };
 
-  interface VideoDescriptionItem {
-    startTime: string;
-    endTime: string;
-    description: string;
-    audioFile?: string;
-  }
+    // Prepare timestamps with normalization
+    const formatTimestamp = (item: VideoDescriptionItem) =>
+      `${normalizeTimestamp(item.startTime)}-${normalizeTimestamp(
+        item.endTime
+      )}`;
+
+    const oldData = previousDescriptions
+      .filter((item) => !item.description.toUpperCase().includes("TALKING"))
+      .map((item) => ({
+        start: normalizeTimestamp(item.startTime),
+        end: normalizeTimestamp(item.endTime),
+        description: item.description,
+      }));
+
+    const newTimestamps = videoDescriptions
+      .filter((item) => !item.description.toUpperCase().includes("TALKING"))
+      .map(formatTimestamp)
+      .join(",");
+
+    try {
+      // Change the form data key from "new_timestamps" to "new_timestamp"
+      const formData = new FormData();
+      formData.append("video_name", videoName);
+      formData.append("old_data", JSON.stringify(oldData));
+      formData.append("new_timestamp", newTimestamps); // Consistent naming
+      
+      const response = await fetch("http://localhost:5000/analyze-timestamps", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+
+        // Create map of existing TALKING segments
+        const talkingMap = new Map(
+          videoDescriptions
+            .filter((item) =>
+              item.description.toUpperCase().includes("TALKING")
+            )
+            .map((item) => [`${item.startTime}-${item.endTime}`, item])
+        );
+
+        // Merge results with existing TALKING segments
+        const mergedDescriptions = [
+          ...result.descriptions,
+          ...Array.from(talkingMap.values()),
+        ].sort(
+          (a, b) =>
+            new Date(`1970-01-01T${a.startTime}`).getTime() -
+            new Date(`1970-01-01T${b.startTime}`).getTime()
+        );
+
+        setVideoDescriptions(mergedDescriptions);
+        setPreviousDescriptions(mergedDescriptions);
+        alert("Video reanalyzed successfully!");
+      } else {
+        const error = await response.json();
+        alert(`Error: ${error.error || "Unknown error"}`);
+      }
+    } catch (error) {
+      console.error("Reanalysis error:", error);
+      alert("Failed to connect to server");
+    }
+  };
 
   const handleRegenerateAudio = async (): Promise<void> => {
     console.log("Descriptions:", videoDescriptions);
-  
-    // Filter out descriptions that contain "TALKING"
-    const descriptionsToRegenerate = videoDescriptions.filter(item => 
-      !item.description.toUpperCase().includes("TALKING")
-    );
-  
-    if (descriptionsToRegenerate.length === 0) {
+
+    // Create a copy of current descriptions to modify
+    const updatedDescriptions = [...videoDescriptions];
+
+    // Get indices and items that need regeneration
+    const regenerationIndices: number[] = [];
+    const regenerationPayload: any[] = [];
+
+    updatedDescriptions.forEach((item, index) => {
+      if (!item.description.toUpperCase().includes("TALKING")) {
+        regenerationIndices.push(index);
+        regenerationPayload.push({
+          description: item.description,
+          timestamps: [parseFloat(item.startTime), parseFloat(item.endTime)],
+          scene_id: item.startTime,
+        });
+      }
+    });
+
+    if (regenerationPayload.length === 0) {
       console.log("No descriptions need regeneration.");
       return;
     }
-  
+
     try {
-      // Send a single request containing all valid descriptions
-      const response = await fetch('http://localhost:5000/text-to-speech', {
-        method: 'POST',
+      const response = await fetch("http://localhost:5000/text-to-speech", {
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
-        body: JSON.stringify(
-          descriptionsToRegenerate.map(item => ({
-            description: item.description,
-            timestamps: [parseFloat(item.startTime), parseFloat(item.endTime)],
-            scene_id: item.startTime, // You can use any unique identifier, like `startTime`
-          }))
-        ),
+        body: JSON.stringify(regenerationPayload),
       });
-  
+
       if (!response.ok) {
-        throw new Error('Failed to regenerate audio');
+        throw new Error("Failed to regenerate audio");
       }
-  
+
       const data = await response.json();
-  
-      // Loop through the response and update the audio files
-      data.audio_files.forEach((audioFileData: { audio_file: string }, index: number) => {
-        // Update the audio file path for each description item
-        descriptionsToRegenerate[index].audioFile = audioFileData.audio_file;
-        console.log(`Updated audio file for description: ${descriptionsToRegenerate[index].description}`);
-      });
-  
+
+      // Update the original array using stored indices
+      data.audio_files.forEach(
+        (audioFileData: { audio_file: string }, responseIndex: number) => {
+          const originalIndex = regenerationIndices[responseIndex];
+          if (
+            originalIndex !== undefined &&
+            updatedDescriptions[originalIndex]
+          ) {
+            updatedDescriptions[originalIndex] = {
+              ...updatedDescriptions[originalIndex],
+              audioFile: audioFileData.audio_file,
+            };
+            console.log(`Updated audio at index ${originalIndex}`);
+          }
+        }
+      );
+
+      // Update state with the modified copy
+      setVideoDescriptions(updatedDescriptions);
     } catch (error) {
       console.error("Error regenerating audio:", error);
     }
   };
-  
-
-
-
 
   const toggleAudioDescription = async () => {
     if (!speechActive) {
@@ -284,103 +366,11 @@ const Workspace3: React.FC = () => {
     } else {
       if (audio) {
         audio.pause();
-        audio.currentTime = 0; // Reset audio to the beginning
+        audio.currentTime = 0;
       }
       setSpeechActive(false);
     }
   };
-
-  // const handleAudioRequest = async () => {
-  //   const formData = new FormData();
-
-  //   try {
-  //     // Use the existing `videoDescriptions` object
-  //     const descriptionsWithId = videoDescriptions.map((item) => ({
-  //       scene_id: item.videoUrl.split("/").pop()?.split(".")[0],
-  //       description: item.description,
-  //     }));
-
-  //     formData.append("scenes", JSON.stringify(descriptionsWithId));
-
-  //     // Send request to generate audio files
-  //     const response = await fetch("http://localhost:5000/generate-audio", {
-  //       method: "POST",
-  //       body: formData,
-  //     });
-
-  //     if (response.ok) {
-  //       const result = await response.blob();
-  //       // Handle the downloaded audio files (either a zip or a single file)
-  //       const link = document.createElement("a");
-  //       const audioUrl = URL.createObjectURL(result);
-
-  //       // If the response is a zip file, it will be handled here
-  //       if (result.type === "application/zip") {
-  //         link.href = audioUrl;
-  //         link.download = "audio_files.zip"; // Download as zip if multiple files
-  //       } else {
-  //         link.href = audioUrl;
-  //         link.download = "audio_description.mp3"; // Single file download
-  //       }
-
-  //       link.click();
-  //     } else {
-  //       alert("Error generating audio descriptions");
-  //     }
-  //   } catch (error) {
-  //     alert("Error connecting to backend");
-  //   }
-  // };
-
-  // const handleEncodeVideo = async () => {
-  //   if (!uploadedVideo || videoDescriptions.length === 0) {
-  //     alert("Please process a video and ensure descriptions are available.");
-  //     return;
-  //   }
-
-  //   const descriptions = videoDescriptions.map((item) => item.description);
-  //   const timestamps = videoDescriptions.map((item) => [
-  //     item.startTime,
-  //     item.endTime,
-  //   ]);
-
-  //   const jsonPayload = {
-  //     video_filename: uploadedVideo.name,
-  //     scenes: videoDescriptions.map((item) => ({
-  //       scene_id: item.videoUrl.split("/").pop()?.split(".")[0],
-  //       description: item.description,
-  //       timestamp: [item.startTime, item.endTime],
-  //       audio_file: item.audioFile,
-  //     })),
-  //   };
-
-  //   try {
-  //     const encodeResponse = await fetch(
-  //       "http://localhost:5000/encode-final-video",
-  //       {
-  //         method: "POST",
-  //         headers: {
-  //           "Content-Type": "application/json",
-  //         },
-  //         body: JSON.stringify(jsonPayload),
-  //       }
-  //     );
-
-  //     if (encodeResponse.ok) {
-  //       const result = await encodeResponse.json();
-  //       const downloadUrl = `http://localhost:5000${result.output_video_url}`;
-
-  //       const link = document.createElement("a");
-  //       link.href = downloadUrl;
-  //       link.download = result.output_video_url.split("/").pop();
-  //       link.click();
-  //     } else {
-  //       alert("Error encoding video with subtitles");
-  //     }
-  //   } catch (error) {
-  //     alert("Error connecting to backend");
-  //   }
-  // };
 
   const handleSave = async () => {
     if (videoDescriptions.length === 0) {
@@ -388,47 +378,76 @@ const Workspace3: React.FC = () => {
       return;
     }
 
-    if (videoDescriptionsStorage.length === 0) {
-      setVideoDescriptionsStorage([
-        {
-          data: videoDescriptions,
-          name,
-          date: new Date().toLocaleDateString(),
-        },
-      ]);
-      return;
-    }
-
-    const newStorage = videoDescriptionsStorage.filter(
-      (item) => item.name !== name
-    );
-
-    setVideoDescriptionsStorage([
-      ...newStorage,
-      {
-        data: videoDescriptions,
-        name,
-        date: new Date().toLocaleDateString("de-DE", {
-          day: "2-digit",
-          month: "2-digit",
-          year: "numeric",
-        }),
-      },
-    ]);
     alert("Your work has been successfully saved!");
   };
 
-  //   const resetAppState = () => {
-  //     if (audio) {
-  //       audio.pause();
-  //       audio.currentTime = 0;
-  //     }
-  //     setSpeechActive(false);
-  //     setVideoDescriptions([]);
-  //     setUploadedVideo(null);
-  //     setCombinedDescriptions("");
-  //     setAudio(null);
-  //   };
+  const handleEncodeVideo = async (videofile: File) => {
+    if (!videofile) {
+      alert("Please upload a video before encoding.");
+      return;
+    }
+
+    const descriptions = videoDescriptions.map((item) => item.description);
+    // .filter((desc) => desc !== "TALKING");
+    const timestamps = videoDescriptions.map((item) => [
+      item.startTime,
+      item.endTime,
+    ]);
+    const audioFiles = videoDescriptions
+      .map((item) => item.audioFile)
+      .filter((audioFile) => audioFile); // Extract audio file names
+    const videoFileName = videofile.name;
+
+    console.log("Descriptions:", descriptions);
+    console.log("Timestamps:", timestamps);
+    console.log("Audio Files:", audioFiles);
+    console.log("VideoDesc:", videoDescriptions);
+
+    if (descriptions.length === 0) {
+      alert(
+        "No valid descriptions to encode. Ensure at least one description is not 'TALKING'."
+      );
+      return;
+    }
+
+    try {
+      const response = await fetch(
+        "http://localhost:5000/encode-video-with-subtitles",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            descriptions,
+            timestamps,
+            audioFiles, // Send audio file names
+            videoFileName,
+          }),
+        }
+      );
+
+      if (response.ok) {
+        const videoBlob = await response.blob();
+        const videoUrl = URL.createObjectURL(videoBlob);
+
+        const link = document.createElement("a");
+        link.href = videoUrl;
+        link.download = `processed_${videoFileName}`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+
+        alert("Video successfully encoded and downloaded.");
+      } else {
+        const error = await response.json();
+        alert(`Error encoding video: ${error.error}`);
+      }
+    } catch (error) {
+      console.error("Error encoding video:", error);
+      alert("Error connecting to the backend.");
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-indigo-900 via-purple-700 to-indigo-600 flex flex-col">
@@ -439,49 +458,12 @@ const Workspace3: React.FC = () => {
           uploadedVideo={uploadedVideo}
           onProcessVideo={handleProcessVideo}
           setUploadedVideo={setUploadedVideo}
-          handleEncodeVideo={function (): void {
-            throw new Error("Function not implemented.");
-          }}
+          handleEncodeVideo={handleEncodeVideo}
           toggleAudioDescription={toggleAudioDescription}
           handleAnalyzeVideo={handleProcessVideo}
-          handleReanalyzeVideo={function (): void {
-            throw new Error("Function not implemented.");
-          }}
-          // handleRegenerateAudio={function (): void {
-          //   throw new Error("Function not implemented.");
-          // }}
+          handleReanalyzeVideo={handleReanalyzeVideo}
           handleRegenerateAudio={handleRegenerateAudio}
         />
-        {/* <div className="mt-4 flex flex-col items-start gap-2">
-          <button
-            onClick={handleSave}
-            className="bg-yellow-400 text-indigo-900 px-6 py-3 rounded-md shadow-md hover:bg-yellow-500 transition-all"
-          >
-            <Save size={20} /> Save Descriptions
-          </button>
-          <button
-            onClick={toggleAudioDescription}
-            className={`${
-              speechActive ? "bg-red-500" : "bg-green-400"
-            } text-indigo-900 px-6 py-3 rounded-md shadow-md hover:transition-all flex items-center gap-2`}
-          >
-            {speechActive ? (
-              <>
-                <Pause size={20} /> Stop Audio
-              </>
-            ) : (
-              <>
-                <Play size={20} /> Play Audio
-              </>
-            )}
-          </button>
-          <button
-            // onClick={handleAudioRequest}
-            className="bg-blue-400 text-indigo-900 px-6 py-3 rounded-md shadow-md hover:bg-blue-500 transition-all"
-          >
-            Generate Audio Files
-          </button>
-        </div> */}
       </main>
     </div>
   );

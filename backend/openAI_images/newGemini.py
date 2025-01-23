@@ -176,6 +176,49 @@ def generate_video_description_with_gemini(video_file_path):
     print("LLM response: ", response)
     return response.text
 
+# def format_response_data(combined_segments, descriptions):
+#     # Sort descriptions by the scene number to ensure the correct order
+#     descriptions_sorted = sorted(descriptions, key=lambda x: x[0])
+
+#     # Create the response structure
+#     response_data = {
+#         "message": "Scene changes detected successfully",
+#         "descriptions": [],
+#         "timestamps": [],
+#         "scene_files": [],
+#         "audio_files": [],  # Add audio_files field
+#         "waveform_image": "./waveforms/waveform.png"
+#     }
+
+#     # Loop through the combined segments to generate the descriptions and timestamps
+#     for idx, segment in enumerate(combined_segments):
+#         # Initialize description as "TALKING" by default
+#         description = "TALKING" if segment["type"] == "TALKING" else ""
+#         audio_file = None  # Initialize audio file as None
+
+#         # Add the description based on segment type
+#         if segment["type"] == "NO_TALKING":
+#             # Find the description and scene file based on the scene number
+#             scene_data = next((desc for desc in descriptions_sorted if desc[0] == idx + 1), None)
+#             if scene_data:
+#                 scene_number, scene_id, scene_description, segment_file, description_audio = scene_data
+#                 description = scene_description
+
+#                 # Add the scene file for NO TALKING segments
+#                 response_data["scene_files"].append(segment_file)
+
+#                 # Add the audio file for the corresponding description
+#                 response_data["audio_files"].append(description_audio)  # Add the audio file path to the response
+
+#         # Append the description to the list
+#         response_data["descriptions"].append(description)
+        
+#         # Add the start and end times to the timestamps list
+#         response_data["timestamps"].append([segment["start"], segment["end"]])
+
+#     return response_data
+
+
 def format_response_data(combined_segments, descriptions):
     # Sort descriptions by the scene number to ensure the correct order
     descriptions_sorted = sorted(descriptions, key=lambda x: x[0])
@@ -192,11 +235,10 @@ def format_response_data(combined_segments, descriptions):
 
     # Loop through the combined segments to generate the descriptions and timestamps
     for idx, segment in enumerate(combined_segments):
-        # Initialize description as "TALKING" by default
+        # Initialize description and audio file
         description = "TALKING" if segment["type"] == "TALKING" else ""
-        audio_file = None  # Initialize audio file as None
+        audio_file = "" if segment["type"] == "TALKING" else None  # Append empty string for "TALKING"
 
-        # Add the description based on segment type
         if segment["type"] == "NO_TALKING":
             # Find the description and scene file based on the scene number
             scene_data = next((desc for desc in descriptions_sorted if desc[0] == idx + 1), None)
@@ -208,15 +250,19 @@ def format_response_data(combined_segments, descriptions):
                 response_data["scene_files"].append(segment_file)
 
                 # Add the audio file for the corresponding description
-                response_data["audio_files"].append(description_audio)  # Add the audio file path to the response
+                audio_file = description_audio  # Use the audio file path
 
         # Append the description to the list
         response_data["descriptions"].append(description)
-        
+
+        # Append the audio file (empty for TALKING, path for NO TALKING)
+        response_data["audio_files"].append(audio_file)
+
         # Add the start and end times to the timestamps list
         response_data["timestamps"].append([segment["start"], segment["end"]])
 
     return response_data
+
 
 
 # The function that combines the talking segments and processes the input

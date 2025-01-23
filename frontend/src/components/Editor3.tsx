@@ -16,10 +16,10 @@ interface VideoTimelineProps {
   uploadedVideo: File | null;
   onProcessVideo: (videoFile: File, action: string) => Promise<void>;
   setUploadedVideo: (file: File | null) => void;
-  handleEncodeVideo: () => void;
+  handleEncodeVideo: (videofile: File) => void;
   toggleAudioDescription: () => void;
   handleAnalyzeVideo: (videoFile: File, action: string) => Promise<void>;
-  handleReanalyzeVideo: () => void;
+  handleReanalyzeVideo: (videoFile: string) => Promise<void>;
   handleRegenerateAudio: () => void;
 }
 
@@ -46,9 +46,25 @@ const TranscriptionEditor3: React.FC<VideoTimelineProps> = ({
   const [currentSubtitle, setCurrentSubtitle] = useState<string>("");
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [videoFile, setVideoFile] = useState<File | null>(null);
+  const [isEncoding, setIsEncoding] = useState<boolean>(false);
+  const [videoVolume, setVideoVolume] = useState<number>(1);
+  const [audioVolume, setAudioVolume] = useState<number>(1);
+
+  // Add these effects to update media volumes
+  useEffect(() => {
+    if (videoRef.current) {
+      videoRef.current.volume = videoVolume;
+    }
+  }, [videoVolume]);
 
   useEffect(() => {
-    if (videoDescriptions.length === 0) return;
+    if (audioRef.current) {
+      audioRef.current.volume = audioVolume;
+    }
+  }, [audioVolume]);
+
+  useEffect(() => {
+    // if (videoDescriptions.length === 0) return;
 
     // console.log(videoDescriptions);
     const currentTimeInSeconds = currentTime;
@@ -101,6 +117,7 @@ const TranscriptionEditor3: React.FC<VideoTimelineProps> = ({
   const handleLoadedMetadata = (): void => {
     if (videoRef.current) {
       setVideoDuration(videoRef.current.duration);
+      console.log("Video Duration:", videoRef.current.duration);
     }
   };
 
@@ -122,78 +139,6 @@ const TranscriptionEditor3: React.FC<VideoTimelineProps> = ({
     setIsPlaying(!isPlaying);
   };
 
-  // const handleVideoUpload = async (
-  //   event: React.MouseEvent<HTMLButtonElement>
-  // ) => {
-  //   const file = event.target.files?.[0];
-  //   if (file) {
-  //     setIsProcessing(true);
-  //     const action = await showProcessingOptions();
-  //     if (!action) {
-  //       setIsProcessing(false);
-  //       return;
-  //     }
-
-  //     try {
-  //       await handleAnalyzeVideo(file, "new_gemini");
-  //       const url = URL.createObjectURL(file);
-  //       setVideoFile(url);
-  //     } catch (error) {
-  //       alert("Error processing video");
-  //     } finally {
-  //       setIsProcessing(false);
-  //     }
-  //   }
-  // };
-
-  // const handleVideoUpload = async (event: MouseEvent<HTMLButtonElement, MouseEvent>) => {
-
-  // }
-
-  //   const showProcessingOptions = async (): Promise<string | null> => {
-  //     return new Promise((resolve) => {
-  //       const select = document.createElement("select");
-  //       select.innerHTML = `
-  //         <option value="">Choose an Action</option>
-  //         <option value="openAI_image">OpenAI with images</option>
-  //         <option value="gemini_whole_video">Gemini only video</option>
-  //         <option value="gemini_optimized">Gemini optimized</option>
-  //         <option value="mock">Mock</option>
-  //         <option value="new_gemini">New Gemini</option>
-  //       `;
-
-  //       const dialog = document.createElement("dialog");
-  //       dialog.innerHTML = `
-  //         <div class="p-4">
-  //           <h2 class="text-lg font-semibold">Select Processing Option</h2>
-  //           ${select.outerHTML}
-  //           <div class="mt-4">
-  //             <button id="confirm" class="bg-blue-500 text-white px-4 py-2 rounded">Confirm</button>
-  //             <button id="cancel" class="bg-gray-300 text-black px-4 py-2 rounded">Cancel</button>
-  //           </div>
-  //         </div>
-  //       `;
-
-  //       document.body.appendChild(dialog);
-  //       dialog.showModal();
-
-  //       dialog.querySelector("#confirm")?.addEventListener("click", () => {
-  //         const selectedValue = (
-  //           dialog.querySelector("select") as HTMLSelectElement
-  //         ).value;
-  //         dialog.close();
-  //         document.body.removeChild(dialog);
-  //         resolve(selectedValue || null);
-  //       });
-
-  //       dialog.querySelector("#cancel")?.addEventListener("click", () => {
-  //         dialog.close();
-  //         document.body.removeChild(dialog);
-  //         resolve(null);
-  //       });
-  //     });
-  //   };
-
   const handleTimeUpdate = (): void => {
     if (videoRef.current) {
       setCurrentTime(videoRef.current.currentTime);
@@ -209,52 +154,6 @@ const TranscriptionEditor3: React.FC<VideoTimelineProps> = ({
     onDescriptionChange(updatedDescriptions);
   };
 
-  // const handleVideoUpload = async (
-  //   event: React.MouseEvent<HTMLButtonElement>
-  // ) => {
-  //   const file = event.target.files?.[0];
-  //   if (file) {
-  //     setIsProcessing(true);
-  //     const action = await showProcessingOptions();
-  //     if (!action) {
-  //       setIsProcessing(false);
-  //       return;
-  //     }
-
-  //     try {
-  //       await handleAnalyzeVideo(file, "new_gemini");
-  //       const url = URL.createObjectURL(file);
-  //       setVideoFile(url);
-  //     } catch (error) {
-  //       alert("Error processing video");
-  //     } finally {
-  //       setIsProcessing(false);
-  //     }
-  //   }
-  // };
-
-  // const handleVideoUpload = async (event: ChangeEvent<HTMLInputElement>) => {
-  //   const file = event.target.files?.[0];
-  //   if (file) {
-  //     setIsProcessing(true);
-  //     const action = await showProcessingOptions();
-  //     if (!action) {
-  //       setIsProcessing(false);
-  //       return;
-  //     }
-
-  //     try {
-  //       await handleAnalyzeVideo(file, "new_gemini");
-  //       const url = URL.createObjectURL(file);
-  //       setVideoFile(url);
-  //     } catch (error) {
-  //       alert("Error processing video");
-  //     } finally {
-  //       setIsProcessing(false);
-  //     }
-  //   }
-  // };
-
   const handleVideoUpload = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
@@ -262,12 +161,6 @@ const TranscriptionEditor3: React.FC<VideoTimelineProps> = ({
       setVideoFile(file);
     }
   };
-
-  // function analyzeVideo(
-  //   event: MouseEvent<HTMLButtonElement, MouseEvent>
-  // ): void {
-  //   throw new Error("Function not implemented.");
-  // }
 
   const analyzeVideo = async (): Promise<void> => {
     if (videoFile) {
@@ -284,6 +177,34 @@ const TranscriptionEditor3: React.FC<VideoTimelineProps> = ({
     }
   };
 
+  const reanalyzeVideo = async (): Promise<void> => {
+    if (videoFile) {
+      try {
+        setIsProcessing(true);
+        await handleReanalyzeVideo(videoFile.name);
+        const url = URL.createObjectURL(videoFile);
+        setVideoUrl(url);
+      } catch (error) {
+        alert("Error reanalyzing video");
+      } finally {
+        setIsProcessing(false);
+      }
+    }
+  };
+
+  const encodeVideo = async (): Promise<void> => {
+    if (videoFile) {
+      try {
+        setIsEncoding(true);
+        handleEncodeVideo(videoFile);
+      } catch (error) {
+        alert("Error encoding video");
+      } finally {
+        setIsEncoding(false);
+      }
+    }
+  };
+
   return (
     <div className="max-w-full overflow-hidden bg-gray-50 h-screen">
       <div className="flex justify-between items-center p-4 bg-gray-800 text-white shadow-md">
@@ -295,6 +216,7 @@ const TranscriptionEditor3: React.FC<VideoTimelineProps> = ({
         </div>
         <div className="flex items-center">
           {isProcessing && <span className="mr-2">Processing video...</span>}
+          {isEncoding && <span className="mr-2">Encoding video...</span>}
         </div>
       </div>
 
@@ -371,47 +293,95 @@ const TranscriptionEditor3: React.FC<VideoTimelineProps> = ({
 
           <div className="flex items-center mb-2 col-span-6">
             <div>
+              {/* Play/Pause button */}
+              <div>
+                <button
+                  className="mr-2 p-2 bg-gray-200 rounded hover:bg-gray-300 w-full"
+                  onClick={togglePlayPause}
+                >
+                  {isPlaying ? (
+                    <Pause className="text-black" />
+                  ) : (
+                    <Play className="text-black" />
+                  )}
+                </button>
+              </div>
+
+              {/* Video Volume Slider */}
+              <div className="flex items-center mr-4">
+                <span className="mr-2">Video:</span>
+                <input
+                  type="range"
+                  min="0"
+                  max="1"
+                  step="0.1"
+                  value={videoVolume}
+                  onChange={(e) => setVideoVolume(parseFloat(e.target.value))}
+                  className="w-24"
+                />
+              </div>
+
+              {/* Audio Volume Slider */}
+              <div className="flex items-center mr-4">
+                <span className="mr-2">Audio:</span>
+                <input
+                  type="range"
+                  min="0"
+                  max="1"
+                  step="0.1"
+                  value={audioVolume}
+                  onChange={(e) => setAudioVolume(parseFloat(e.target.value))}
+                  className="w-24"
+                />
+              </div>
+
+              {/* Time display */}
+              <div className="flex items-center">
+                <Clock className="mr-1" />
+                <span>
+                  {currentTime.toFixed(3)}s / {videoDuration.toFixed(3)}s
+                </span>
+              </div>
+            </div>
+            <div>
               <button
-                className="mr-2 p-2 bg-gray-200 rounded hover:bg-gray-300 w-full"
-                onClick={togglePlayPause}
+                className="mr-2 p-2 bg-gray-200 rounded hover:bg-gray-300"
+                onClick={encodeVideo}
               >
-                {isPlaying ? (
-                  <Pause className="text-black" />
-                ) : (
-                  <Play className="text-black" />
-                )}
+                Encode
               </button>
+              <button
+                className="mr-2 p-2 bg-gray-200 rounded hover:bg-gray-300"
+                onClick={analyzeVideo}
+              >
+                Analyze
+              </button>
+              <button
+                className="mr-2 p-2 bg-gray-200 rounded hover:bg-gray-300"
+                onClick={reanalyzeVideo}
+              >
+                Reanalyze
+              </button>
+              <button
+                className="mr-2 p-2 bg-gray-200 rounded hover:bg-gray-300"
+                onClick={handleRegenerateAudio}
+              >
+                Regenerate Audio
+              </button>
+              <div className="w-full mb-4">
+                <input
+                  type="range"
+                  min="0"
+                  max={videoDuration || 0}
+                  step="0.1"
+                  value={currentTime}
+                  onChange={(e) =>
+                    handleTimelineUpdate(parseFloat(e.target.value))
+                  }
+                  className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                />
+              </div>
             </div>
-            <div className="flex items-center">
-              <Clock className="mr-1" />
-              <span>
-                {currentTime.toFixed(3)}s / {videoDuration.toFixed(3)}s
-              </span>
-            </div>
-            <button
-              className="mr-2 p-2 bg-gray-200 rounded hover:bg-gray-300"
-              onClick={handleEncodeVideo}
-            >
-              Encode Video
-            </button>
-            <button
-              className="mr-2 p-2 bg-gray-200 rounded hover:bg-gray-300"
-              onClick={analyzeVideo}
-            >
-              Analyze Video
-            </button>
-            <button
-              className="mr-2 p-2 bg-gray-200 rounded hover:bg-gray-300"
-              onClick={handleReanalyzeVideo}
-            >
-              Reanalyze Video
-            </button>
-            <button
-              className="mr-2 p-2 bg-gray-200 rounded hover:bg-gray-300"
-              onClick={handleRegenerateAudio}
-            >
-              Regenerate Audio
-            </button>
           </div>
         </div>
 
@@ -422,7 +392,9 @@ const TranscriptionEditor3: React.FC<VideoTimelineProps> = ({
             onDescriptionChange={onDescriptionChange}
             onTimeUpdate={handleTimelineUpdate}
             visualizer={<div></div>}
-            isPlaying={isPlaying}  
+            isPlaying={isPlaying}
+            videoduration={videoDuration}
+            audioVolume={audioVolume}
           />
         </div>
       </div>
@@ -430,12 +402,63 @@ const TranscriptionEditor3: React.FC<VideoTimelineProps> = ({
   );
 };
 
+// const convertTimestampToSeconds = (timestamp: string): number => {
+//   const parts = timestamp.split(":");
+//   const seconds = parseFloat(parts.pop() || "0");
+//   const minutes = parseInt(parts.pop() || "0", 10);
+//   const hours = parseInt(parts.pop() || "0", 10);
+//   return hours * 3600 + minutes * 60 + seconds;
+// };
+
 const convertTimestampToSeconds = (timestamp: string): number => {
-  const parts = timestamp.split(":");
-  const seconds = parseFloat(parts.pop() || "0");
-  const minutes = parseInt(parts.pop() || "0", 10);
-  const hours = parseInt(parts.pop() || "0", 10);
-  return hours * 3600 + minutes * 60 + seconds;
+  // Check if the timestamp is in the format hhmmSSss (e.g., 000279 for 00:02.79)
+  if (/^\d{6}(\.\d+)?$/.test(timestamp)) {
+    // Extract hours, minutes, seconds, and fractional seconds
+    const hours = parseInt(timestamp.slice(0, 2), 10);
+    const minutes = parseInt(timestamp.slice(2, 4), 10);
+    const seconds = parseFloat(timestamp.slice(4)); // Handles fractional seconds
+
+    // Validate minutes and seconds
+    if (minutes < 0 || minutes >= 60) {
+      throw new Error(
+        `Invalid minutes value: ${minutes}. Must be between 0 and 59.`
+      );
+    }
+    if (seconds < 0 || seconds >= 60) {
+      throw new Error(
+        `Invalid seconds value: ${seconds}. Must be between 0 and 59.999.`
+      );
+    }
+
+    return hours * 3600 + minutes * 60 + seconds;
+  }
+
+  // Check if the timestamp is in the format HH:MM:SS.sss
+  if (/^(\d{1,2}):(\d{1,2}):(\d{1,2}(?:\.\d+)?)$/.test(timestamp)) {
+    const parts = timestamp.split(":");
+    const hours = parseInt(parts[0], 10);
+    const minutes = parseInt(parts[1], 10);
+    const seconds = parseFloat(parts[2]); // Handles fractional seconds
+
+    // Validate minutes and seconds
+    if (minutes < 0 || minutes >= 60) {
+      throw new Error(
+        `Invalid minutes value: ${minutes}. Must be between 0 and 59.`
+      );
+    }
+    if (seconds < 0 || seconds >= 60) {
+      throw new Error(
+        `Invalid seconds value: ${seconds}. Must be between 0 and 59.999.`
+      );
+    }
+
+    return hours * 3600 + minutes * 60 + seconds;
+  }
+
+  // If neither format matches, throw an error
+  throw new Error(
+    `Invalid timestamp format: ${timestamp}. Expected formats: HH:MM:SS.sss or hhmmSSss`
+  );
 };
 
 export default TranscriptionEditor3;

@@ -8,6 +8,8 @@ interface TimelineVisualizerProps {
   onTimeUpdate?: (time: number) => void;
   visualizer?: React.ReactNode;
   isPlaying: boolean;
+  videoduration: number;
+  audioVolume: number;
 }
 
 interface VideoDescriptionItem {
@@ -15,6 +17,10 @@ interface VideoDescriptionItem {
   endTime: string;
   description: string;
   audioFile?: string;
+}
+
+interface AudioDurations {
+  [key: number]: number;
 }
 
 interface TimelineElement {
@@ -41,6 +47,8 @@ const TimelineVisualizer: React.FC<TimelineVisualizerProps> = ({
   onTimeUpdate,
   visualizer,
   isPlaying,
+  videoduration,
+  audioVolume,
 }) => {
   const [elements, setElements] = useState<TimelineElement[]>([]);
   const [containers, setContainers] = useState<ContainerElement[]>([]);
@@ -50,25 +58,76 @@ const TimelineVisualizer: React.FC<TimelineVisualizerProps> = ({
   const resizingRef = useRef(false);
   const audioRef = useRef<{ [key: string]: HTMLAudioElement | null }>({});
   const [volume, setVolume] = useState(1); // State to store the volume level
+  const [scrollPosition, setScrollPosition] = useState(0);
+  const [containerWidth, setContainerWidth] = useState(0);
+  const [audioDurations, setAudioDurations] = useState<AudioDurations>({});
 
-  const timeToPixels = (timeStr: string): number => {
-    const [hours = "0", minutes = "0", seconds = "0"] = timeStr.split(":");
-    const totalSeconds =
-      parseInt(hours) * 3600 + parseInt(minutes) * 60 + parseFloat(seconds);
-    return totalSeconds * 100;
-  };
+  // setTimelineWidth(videoduration * 100);
 
+  // const timeToPixels = (timeStr: string): number => {
+  //   const [hours = "0", minutes = "0", seconds = "0"] = timeStr.split(":");
+  //   const totalSeconds =
+  //     parseInt(hours) * 3600 + parseInt(minutes) * 60 + parseFloat(seconds);
+  //   return totalSeconds * 100;
+  // };
+
+  // const pixelsToTime = (pixels: number): string => {
+  //   const totalSeconds = pixels / 100;
+  //   const hours = Math.floor(totalSeconds / 3600);
+  //   const minutes = Math.floor((totalSeconds % 3600) / 60);
+  //   const seconds = (totalSeconds % 60).toFixed(3);
+  //   return `${hours}:${minutes.toString().padStart(2, "0")}:${seconds.padStart(
+  //     6,
+  //     "0"
+  //   )}`;
+  // };
   const pixelsToTime = (pixels: number): string => {
     const totalSeconds = pixels / 100;
     const hours = Math.floor(totalSeconds / 3600);
     const minutes = Math.floor((totalSeconds % 3600) / 60);
-    const seconds = (totalSeconds % 60).toFixed(3);
-    return `${hours}:${minutes.toString().padStart(2, "0")}:${seconds.padStart(
-      6,
-      "0"
-    )}`;
+    const seconds = (totalSeconds % 60).toFixed(2); // Ensures 2 decimal places for fractional seconds
+
+    // Pad hours, minutes, and seconds to ensure consistent formatting
+    return `${hours.toString().padStart(2, "0")}:${minutes
+      .toString()
+      .padStart(2, "0")}:${seconds.padStart(5, "0")}`;
   };
 
+  const timeToPixels = (timeStr: string): number => {
+    // Check if the timestamp is in the format hhmmSSss (e.g., 000279 for 00:02.79)
+    if (/^\d{6}(\.\d+)?$/.test(timeStr)) {
+      const hours = parseInt(timeStr.slice(0, 2), 10);
+      const minutes = parseInt(timeStr.slice(2, 4), 10);
+      const seconds = parseFloat(timeStr.slice(4)); // Handles fractional seconds
+      const totalSeconds = hours * 3600 + minutes * 60 + seconds;
+      return totalSeconds * 100;
+    }
+
+    // Check if the timestamp is in the format HH:mm:ss.ss or HH:MM:SS.sss
+    if (/^(\d{1,2}):(\d{1,2}):(\d{1,2}(?:\.\d+)?)$/.test(timeStr)) {
+      const [hours = "0", minutes = "0", seconds = "0"] = timeStr.split(":");
+      const totalSeconds =
+        parseInt(hours) * 3600 + parseInt(minutes) * 60 + parseFloat(seconds);
+      return totalSeconds * 100;
+    }
+
+    // If neither format matches, throw an error
+    throw new Error(
+      `Invalid timestamp format: ${timeStr}. Expected formats: HH:mm:ss.ss, HH:MM:SS.sss, or hhmmSSss`
+    );
+  };
+
+  useEffect(() => {
+    const updateContainerSize = () => {
+      if (timelineRef.current) {
+        setContainerWidth(timelineRef.current.offsetWidth);
+      }
+    };
+
+    updateContainerSize();
+    window.addEventListener("resize", updateContainerSize);
+    return () => window.removeEventListener("resize", updateContainerSize);
+  }, []);
   // Function to update the volume of all audio elements
   const updateAudioVolume = (newVolume: number) => {
     setVolume(newVolume);
@@ -84,6 +143,10 @@ const TimelineVisualizer: React.FC<TimelineVisualizerProps> = ({
     const newVolume = parseFloat(e.target.value);
     updateAudioVolume(newVolume);
   };
+
+  useEffect(() => {
+    updateAudioVolume(audioVolume);
+  }, [audioVolume]);
 
   const updateContainers = (updatedElements: TimelineElement[]) => {
     const sortedElements = [...updatedElements].sort(
@@ -138,6 +201,21 @@ const TimelineVisualizer: React.FC<TimelineVisualizerProps> = ({
     }
   };
 
+  useEffect(() => {
+    elements.forEach((element) => {
+      const updatedElement = videoDescriptions.find(
+        (desc) => desc.description === element.text
+      );
+      if (updatedElement && updatedElement.audioFile !== element.audioFile) {
+        const audio = audioRef.current[element.id];
+        if (audio) {
+          audio.src = `http://localhost:5000/${updatedElement.audioFile}`;
+          audio.load(); // Load the new audio file
+          element.audioFile = updatedElement.audioFile; // Update the element's audioFile reference
+        }
+      }
+    });
+  }, [videoDescriptions, elements]);
   // Add new scene functionality
   const addNewScene = () => {
     const currentPosition = currentTime * 100;
@@ -179,18 +257,25 @@ const TimelineVisualizer: React.FC<TimelineVisualizerProps> = ({
   };
 
   // Handle elements and containers based on video descriptions
-  useEffect(() => {
-    if (videoDescriptions.length > 0) {
-      const maxEndTime = Math.max(
-        ...videoDescriptions.map((desc) => timeToPixels(desc.endTime))
-      );
-      setTimelineWidth(maxEndTime);
-    } else {
-      setTimelineWidth(window.innerWidth);
-    }
-  }, [videoDescriptions]);
+  // useEffect(() => {
+  //   if (videoDescriptions.length > 0) {
+  //     const maxEndTime = Math.max(
+  //       ...videoDescriptions.map((desc) => timeToPixels(desc.endTime))
+  //     );
+  //     setTimelineWidth(maxEndTime);
+  //   } else {
+  //     setTimelineWidth(window.innerWidth);
+  //   }
+  // }, [videoDescriptions]);
 
   useEffect(() => {
+    setTimelineWidth(videoduration * 100);
+  }, [videoduration]);
+
+  // Update elements and containers when video descriptions or timeline width changes
+  useEffect(() => {
+    if (videoDescriptions.length === 0) return;
+
     const newElements = videoDescriptions.map((desc, index) => ({
       id: index + 1,
       text: desc.description,
@@ -198,7 +283,7 @@ const TimelineVisualizer: React.FC<TimelineVisualizerProps> = ({
       width: timeToPixels(desc.endTime) - timeToPixels(desc.startTime),
       startTime: desc.startTime,
       endTime: desc.endTime,
-      audioFile: desc.audioFile || undefined, // Ensure `audioFile` is included
+      audioFile: desc.audioFile || undefined,
     }));
 
     setElements(newElements);
@@ -328,56 +413,99 @@ const TimelineVisualizer: React.FC<TimelineVisualizerProps> = ({
     onTimeUpdate(newTime);
   };
 
+  // useEffect(() => {
+  //   containers.forEach(({ id, element }) => {
+  //     const audio = audioRef.current[id];
+  //     if (!audio || !element.audioFile) return;
+
+  //     const startSeconds = timeToPixels(element.startTime) / 100;
+  //     const endSeconds = timeToPixels(element.endTime) / 100;
+
+  //     if (currentTime >= startSeconds && currentTime < endSeconds) {
+  //       console.log("currentTime", audio.currentTime);
+  //       let audioOffset = currentTime - startSeconds;
+  //       audioOffset = Number(audioOffset.toFixed(6)); // Limit to 6 decimal places
+  //       console.log("audioOffset", audioOffset);
+  //       // audio.currentTime = audioOffset;
+
+  //       // Rest of the code remains the same
+  //       if (isPlaying && audio.paused) {
+  //         console.log(
+  //           `Playing audio for ID: ${id}, File: ${element.audioFile}`
+  //         );
+  //         audio
+  //           .play()
+  //           .catch((error) => console.error("Audio playback error:", error));
+  //       } else if (!isPlaying && !audio.paused) {
+  //         console.log(
+  //           `Pausing audio for ID: ${id}, File: ${element.audioFile}`
+  //         );
+  //         audio.pause();
+  //       }
+  //     } else {
+  //       audio.pause();
+  //     }
+  //   });
+  // }, [currentTime, containers, isPlaying]);
+
   useEffect(() => {
-    containers.forEach(({ id, element }) => {
-      const audio = audioRef.current[id];
+    elements.forEach((element) => {
+      const audio = audioRef.current[element.id];
       if (!audio || !element.audioFile) return;
 
-      const startSeconds = timeToPixels(element.startTime) / 100;
-      const endSeconds = timeToPixels(element.endTime) / 100;
+      const elementStartTime = element.position / 100;
+      const elementEndTime = (element.position + element.width) / 100;
 
-      if (currentTime >= startSeconds && currentTime < endSeconds) {
-        console.log("currentTime", audio.currentTime);
-        let audioOffset = currentTime - startSeconds;
-        audioOffset = Number(audioOffset.toFixed(6)); // Limit to 6 decimal places
-        console.log("audioOffset", audioOffset);
-        // audio.currentTime = audioOffset;
+      if (currentTime >= elementStartTime && currentTime < elementEndTime) {
+        const audioOffset = currentTime - elementStartTime;
 
-        // Rest of the code remains the same
-        if (isPlaying && audio.paused) {
-          console.log(
-            `Playing audio for ID: ${id}, File: ${element.audioFile}`
+        if (audio.paused && isPlaying) {
+          audio.currentTime = audioOffset;
+          const timeRemaining = Math.min(
+            audio.duration - audioOffset,
+            elementEndTime - currentTime
           );
+
           audio
             .play()
+            .then(() => {
+              setTimeout(() => {
+                if (!audio.paused) {
+                  audio.pause();
+                }
+              }, timeRemaining * 1000);
+            })
             .catch((error) => console.error("Audio playback error:", error));
-        } else if (!isPlaying && !audio.paused) {
-          console.log(
-            `Pausing audio for ID: ${id}, File: ${element.audioFile}`
-          );
-          audio.pause();
         }
-      } else {
+      } else if (!audio.paused) {
         audio.pause();
       }
     });
-  }, [currentTime, containers, isPlaying]);
+  }, [currentTime, elements, isPlaying]);
+
+  // Add this callback for audio metadata
+  const handleAudioMetadata = (id: number, duration: number) => {
+    setAudioDurations((prev) => ({ ...prev, [id]: duration }));
+  };
+
+  useEffect(() => {
+    if (!timelineRef.current) return;
+
+    const redBarPosition = currentTime * 100;
+    const scrollLeft = timelineRef.current.scrollLeft;
+    const visibleStart = scrollLeft;
+    const visibleEnd = scrollLeft + containerWidth;
+
+    if (redBarPosition < visibleStart || redBarPosition > visibleEnd - 50) {
+      timelineRef.current.scrollTo({
+        left: redBarPosition - containerWidth / 2,
+        behavior: "smooth",
+      });
+    }
+  }, [currentTime, containerWidth]);
 
   return (
     <div>
-      {" "}
-      {/* Volume Slider */}
-      <div className="absolute top-2 left-0 w-full px-4">
-        <input
-          type="range"
-          min="0"
-          max="1"
-          step="0.01"
-          value={volume}
-          onChange={handleVolumeChange}
-          className="w-full"
-        />
-      </div>
       <div
         className="relative h-40 bg-gray-800 overflow-hidden"
         ref={timelineRef}
@@ -454,10 +582,25 @@ const TimelineVisualizer: React.FC<TimelineVisualizerProps> = ({
                   disabled={resizingRef.current}
                 >
                   <div
-                    className="h-16 bg-gray-700 border border-gray-600 rounded-lg flex items-center cursor-grab"
+                    className="h-16 bg-gray-700 border border-gray-600 rounded-lg flex items-center cursor-grab relative"
                     style={{ width: `${element.width}px` }}
                     onClick={(e) => e.stopPropagation()}
                   >
+                    {/* Add duration bar at the bottom */}
+                    {element.audioFile && audioDurations[id] && (
+                      <div className="absolute bottom-0 left-0 right-0 h-1 bg-blue-500">
+                        <div
+                          className="h-full bg-green-500"
+                          style={{
+                            width: `${Math.min(
+                              (audioDurations[id] * 100) /
+                                (element.width / 100),
+                              100
+                            )}%`,
+                          }}
+                        />
+                      </div>
+                    )}
                     <div className="bg-green-600 text-white text-xs font-bold px-2 py-1">
                       {id}
                     </div>
@@ -467,7 +610,14 @@ const TimelineVisualizer: React.FC<TimelineVisualizerProps> = ({
 
                     {/* Hidden Audio Player for Each Element */}
                     <audio
-                      ref={(el) => (audioRef.current[id] = el)}
+                      ref={(el) => {
+                        audioRef.current[id] = el;
+                        if (el && element.audioFile) {
+                          el.onloadedmetadata = () => {
+                            if (el) handleAudioMetadata(id, el.duration);
+                          };
+                        }
+                      }}
                       src={`http://localhost:5000/${element.audioFile}`}
                       preload="auto"
                     />
