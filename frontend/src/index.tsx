@@ -7,6 +7,9 @@ import LandingPage from "./pages/landingPage";
 import { WorkSpace } from "./pages/workspace/index";
 import reportWebVitals from "./reportWebVitals";
 import App from "./App";
+import LandingPage from "./LandingPage";
+import FAQPage from "./FAQPage";
+
 
 const root = ReactDOM.createRoot(
   document.getElementById("root") as HTMLElement
@@ -19,6 +22,7 @@ root.render(
         <Route path="workspace" element={<WorkSpace />} />
         <Route path="dashboard" element={<Dashboard />} />
         <Route path="main" element={<App />} />
+        <Route path="faq" element={<FAQPage />} />
       </Routes>
     </BrowserRouter>
   </React.StrictMode>
