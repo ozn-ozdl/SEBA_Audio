@@ -1,3 +1,4 @@
+import { produce } from "immer";
 import React, { useState, useEffect } from "react";
 
 interface VideoDescriptionItem {
@@ -9,11 +10,15 @@ interface VideoDescriptionItem {
 
 interface Props {
   videoDescriptions: VideoDescriptionItem[];
+  setVideoDescriptions: React.Dispatch<
+    React.SetStateAction<VideoDescriptionItem[]>
+  >;
   onDescriptionChange: (updatedDescriptions: VideoDescriptionItem[]) => void;
 }
 
 const VideoDescription: React.FC<Props> = ({
   videoDescriptions,
+  setVideoDescriptions,
   onDescriptionChange,
 }) => {
   const [editableDescriptions, setEditableDescriptions] = useState<
@@ -30,17 +35,22 @@ const VideoDescription: React.FC<Props> = ({
     setEditableDescriptions(updatedDescriptions);
 
     onDescriptionChange(updatedDescriptions);
+    setVideoDescriptions(
+      produce((draft) => {
+        draft[index].description = newDescription;
+      })
+    );
   };
 
   return (
     <div className="space-y-4">
-      {editableDescriptions.length === 0 ? (
+      {videoDescriptions.length === 0 ? (
         <p className="text-gray-500 text-sm">
           No descriptions available. Process a video to get started.
         </p>
       ) : (
         <ul className="space-y-4">
-          {editableDescriptions.map((item, index) => (
+          {videoDescriptions.map((item, index) => (
             <li
               key={index}
               className="border bg-gray-100 p-4 rounded-lg shadow-sm"

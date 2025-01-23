@@ -102,8 +102,10 @@ def process_video():
             talking_timestamps = sg.get_talking_timestamps_with_gemini(
                 video_path).strip().splitlines()
             if (talking_timestamps[0] != "NO_TALKING"):
-                scenes_timestamps = sg.scene_list_to_string_list(detected_scenes)
-                talking_timestamps = sg.format_talking_timestamps(talking_timestamps)
+                scenes_timestamps = sg.scene_list_to_string_list(
+                    detected_scenes)
+                talking_timestamps = sg.format_talking_timestamps(
+                    talking_timestamps)
                 detected_scenes = sg.combine_speaking_and_scenes(
                     scenes_timestamps, talking_timestamps)
 
@@ -176,6 +178,7 @@ def get_processed_video(filename):
         return send_from_directory(PROCESSED_FOLDER, filename, as_attachment=True)
     except FileNotFoundError:
         return jsonify({"error": "File not found"}), 404
+
 
 @app.route("/text-to-speech", methods=["POST"])
 def text_to_speech():

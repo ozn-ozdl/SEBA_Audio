@@ -14,7 +14,7 @@ const App: React.FC = () => {
   }
 
   const [videoDescriptions, setVideoDescriptions] = useState<
-  VideoDescriptionItem[]
+    VideoDescriptionItem[]
   >([]);
   const [uploadedVideo, setUploadedVideo] = useState<File | null>(null);
   const [combinedDescriptions, setCombinedDescriptions] = useState("");
@@ -112,7 +112,7 @@ const App: React.FC = () => {
 
     const descriptions = videoDescriptions.map((item) => item.description);
     const timestamps = videoDescriptions.map((item) => [
-      item.startTime, 
+      item.startTime,
       item.endTime,
     ]);
 
@@ -187,6 +187,7 @@ const App: React.FC = () => {
           <VideoDescription
             videoDescriptions={videoDescriptions}
             onDescriptionChange={handleDescriptionChange}
+            setVideoDescriptions={setVideoDescriptions}
           />
         </div>
 
