@@ -5,6 +5,7 @@ import reportWebVitals from "./reportWebVitals";
 import { BrowserRouter, Route, Routes } from "react-router-dom";
 import App from "./App";
 import LandingPage from "./LandingPage";
+import FAQPage from "./FAQPage";
 
 const root = ReactDOM.createRoot(
   document.getElementById("root") as HTMLElement
@@ -15,6 +16,7 @@ root.render(
       <Routes>
         <Route path="/" element={<LandingPage />} />
         <Route path="main" element={<App />} />
+        <Route path="faq" element={<FAQPage />} />
       </Routes>
     </BrowserRouter>
   </React.StrictMode>
