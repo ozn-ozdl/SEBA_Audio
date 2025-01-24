@@ -10,6 +10,8 @@ import reportWebVitals from "./reportWebVitals";
 import Workspace2 from "./pages/workspace/index2";
 import Workspace3 from "./pages/workspace/index3";
 import App from "./App";
+import FAQ from "./pages/faq/index";
+
 
 const root = ReactDOM.createRoot(
   document.getElementById("root") as HTMLElement
@@ -22,6 +24,7 @@ root.render(
         <Route path="workspace" element={<Workspace3 />} />
         <Route path="dashboard" element={<Dashboard />} />
         <Route path="main" element={<App />} />
+        <Route path="faq" element={<FAQ />} />
       </Routes>
     </BrowserRouter>
   </React.StrictMode>
