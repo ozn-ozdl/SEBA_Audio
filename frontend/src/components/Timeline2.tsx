@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Rnd } from "react-rnd";
-import "./custom_styles/timeline.css";
 
 interface TimelineVisualizerProps {
   videoDescriptions: VideoDescriptionItem[];
