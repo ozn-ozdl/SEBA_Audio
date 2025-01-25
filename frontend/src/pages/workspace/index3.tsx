@@ -396,8 +396,74 @@ const Workspace3: React.FC = () => {
     }
   };
 
+  const BackgroundSVG = () => (
+    <svg
+      className="absolute inset-0 w-full h-full z-0"
+      viewBox="0 0 1440 900"
+      preserveAspectRatio="none"
+    >
+      {/* Base gradient */}
+      <defs>
+        <linearGradient id="mainGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop
+            offset="0%"
+            style={{ stopColor: "#4f46e5", stopOpacity: 0.2 }}
+          />
+          <stop
+            offset="50%"
+            style={{ stopColor: "#7c3aed", stopOpacity: 0.15 }}
+          />
+          <stop
+            offset="100%"
+            style={{ stopColor: "#4338ca", stopOpacity: 0.25 }}
+          />
+        </linearGradient>
+
+        {/* Random blob shapes */}
+        <filter id="noise">
+          <feTurbulence
+            type="fractalNoise"
+            baseFrequency="0.8"
+            numOctaves="4"
+          />
+          <feDisplacementMap in="SourceGraphic" scale="20" />
+        </filter>
+      </defs>
+
+      {/* Background rectangle */}
+      <rect width="100%" height="100%" fill="url(#mainGradient)" />
+
+      {/* Color blobs */}
+      <path
+        d="M200 150 Q 300 50 400 150 T 600 150 T 800 50 T 1000 150 T 1200 50"
+        fill="#6366f1"
+        opacity="0.1"
+        filter="url(#noise)"
+      />
+
+      <circle cx="80%" cy="30%" r="120" fill="#8b5cf6" opacity="0.08" />
+      <ellipse
+        cx="20%"
+        cy="70%"
+        rx="180"
+        ry="120"
+        fill="#a855f7"
+        opacity="0.12"
+      />
+      <rect
+        x="60%"
+        y="60%"
+        width="300"
+        height="200"
+        fill="#7c3aed"
+        opacity="0.1"
+        transform="rotate(45)"
+      />
+    </svg>
+  );
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-indigo-900 via-purple-700 to-indigo-600 flex flex-col">
+    <div className="min-h-screen bg-gradient-to-br from-indigo-900/100 via-purple-700/100 to-indigo-600/100 flex flex-col">
       <main className="flex-grow h-screen overflow-hidden">
         <TranscriptionEditor3
           videoDescriptions={videoDescriptions}
@@ -415,7 +481,7 @@ const Workspace3: React.FC = () => {
         <div className="fixed bottom-4 right-4">
           <button
             onClick={reloadPreviousDescriptions}
-            className="p-3 bg-blue-600 text-white rounded-full shadow-lg hover:bg-blue-700 transition-all"
+            className="-3 bg-blue-600/80 text-white rounded-full shadow-lg hover:bg-blue-700/90 transition-all backdrop-blur-sm"
             title="Reload previous descriptions"
           >
             <RefreshCw className="w-6 h-6" />

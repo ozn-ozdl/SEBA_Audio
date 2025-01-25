@@ -210,10 +210,11 @@ const TranscriptionEditor3: React.FC<VideoTimelineProps> = ({
     }
   };
 
+  
   return (
-    <div className="max-w-full overflow-hidden bg-gray-50 h-screen flex flex-col">
+    <div className="max-w-full overflow-hidden bg-gray-700/70 backdrop-blur-sm h-screen flex flex-col">
       {/* Header */}
-      <div className="flex justify-between items-center p-2 bg-gray-800 text-white shadow-md">
+      <div className="flex justify-between items-center p-2 bg-gray-800/70 text-white shadow-md backdrop-blur-sm">
         <div className="flex items-center">
           <button className="mr-2">
             <Settings className="w-5 h-5 text-white" />
@@ -223,25 +224,25 @@ const TranscriptionEditor3: React.FC<VideoTimelineProps> = ({
 
         <div className="flex items-center">
           <button
-            className="mr-2 p-1 bg-gray-200 rounded hover:bg-gray-300"
+            className="mr-2 p-1 border-2 border-gray-200/50 rounded hover:bg-gray-500/60 hover:text-white"
             onClick={encodeVideo}
           >
             Encode
           </button>
           <button
-            className="mr-2 p-1 bg-gray-200 rounded hover:bg-gray-300"
+            className="mr-2 p-1 border-2 border-gray-200/50 rounded hover:bg-gray-500/60 hover:text-white"
             onClick={analyzeVideo}
           >
             Analyze
           </button>
           <button
-            className="mr-2 p-1 bg-gray-200 rounded hover:bg-gray-300"
+            className="mr-2 p-1 border-2 border-gray-200/50 rounded hover:bg-gray-500/60 hover:text-white"
             onClick={reanalyzeVideo}
           >
             Reanalyze
           </button>
           <button
-            className="mr-2 p-1 bg-gray-200 rounded hover:bg-gray-300"
+            className="mr-2 p-1 border-2 border-gray-200/50 rounded hover:bg-gray-500/60 hover:text-white"
             onClick={handleRegenerateAudio}
           >
             Regenerate Audio
@@ -258,9 +259,9 @@ const TranscriptionEditor3: React.FC<VideoTimelineProps> = ({
       <div className="flex flex-1 overflow-hidden">
         {/* Collapsible Descriptions Sidebar */}
         {isDescriptionsVisible && (
-          <div className="w-1/3 border-r bg-white overflow-y-auto p-4">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-lg font-semibold">Scenes</h2>
+          <div className="w-1/3 border-r overflow-y-auto p-1 backdrop-blur-sm">
+            <div className="flex justify-between items-center mb-2">
+              <h2 className="text-lg font-semibold">Description Editor</h2>
               <button
                 onClick={() => setIsDescriptionsVisible(false)}
                 className="p-1 hover:bg-gray-100 rounded"
@@ -274,28 +275,27 @@ const TranscriptionEditor3: React.FC<VideoTimelineProps> = ({
               .map((scene, index) => (
                 <div
                   key={scene.startTime}
-                  className={`p-2 mb-2 rounded-lg border ${
+                  className={`p-1 mb-2 rounded-lg border ${
                     selectedScene === scene.startTime
-                      ? "bg-blue-500 text-black"
-                      : "hover:bg-gray-200"
+                      ? "bg-blue-100/50"
+                      : "hover:bg-gray-100/40"
                   }`}
                   onClick={() => setSelectedScene(scene.startTime)}
                 >
-                  <div className="flex items-center">
-                    <div>
-                      {`Scene ${index + 1}: ${(scene.startTime / 1000).toFixed(
-                        3
-                      )}s - ${(scene.endTime / 1000).toFixed(3)}s`}
+                  <div className="flex flex-col">
+                    <div className="text-xs text-gray-100 mb-1">
+                      {`${(scene.startTime / 1000).toFixed(
+                        2
+                      )}s - ${(scene.endTime / 1000).toFixed(2)}s`}
                     </div>
-                    <div>
-                      <textarea
-                        className="w-full border border-gray-300 rounded p-1 mt-1"
-                        value={scene.description}
-                        onChange={(e) =>
-                          updateSceneText(scene.startTime, e.target.value)
-                        }
-                      />
-                    </div>
+                    <textarea
+                      className="w-full border- border-gray-900 rounded p-2 text-sm"
+                      rows={3}
+                      value={scene.description}
+                      onChange={(e) =>
+                        updateSceneText(scene.startTime, e.target.value)
+                      }
+                    />
                   </div>
                 </div>
               ))}
@@ -317,7 +317,7 @@ const TranscriptionEditor3: React.FC<VideoTimelineProps> = ({
           {/* Video Container */}
           <div className="flex-1 relative">
             {videoFile ? (
-              <div className="absolute inset-0 flex items-center justify-center">
+              <div className="absolute inset-0 flex items-center justify-center bg-black/20">
                 <video
                   ref={videoRef}
                   className="w-full h-full object-contain"
@@ -353,7 +353,7 @@ const TranscriptionEditor3: React.FC<VideoTimelineProps> = ({
           </div>
 
           {/* Video Controls */}
-          <div className="p-2 bg-gray-800 flex items-center justify-between">
+          <div className="p-2 bg-gray-800/70 flex items-center justify-between backdrop-blur-sm">
             {/* Play Controls */}
             <button
               className="p-3 bg-gray-200 rounded-full hover:bg-gray-300"
@@ -393,7 +393,7 @@ const TranscriptionEditor3: React.FC<VideoTimelineProps> = ({
       </div>
 
       {/* Timeline Visualizer */}
-      <div className="p-1 bg-white border-t shadow-md">
+      <div className="">
         <TimelineVisualizer2
           videoDescriptions={videoDescriptions}
           currentTime={currentTime} // Convert to milliseconds

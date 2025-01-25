@@ -298,6 +298,174 @@ def process_video():
         print(traceback.format_exc())
         return jsonify({"error": str(e)}), 500
     
+# @app.route("/encode-video-with-subtitles", methods=["POST"])
+# def encode_video_with_subtitles():
+#     UPLOAD_FOLDER = "uploads"
+#     PROCESSED_FOLDER = "processed"
+#     temp_files = []
+
+#     try:
+#         data = request.get_json()
+#         if not data:
+#             return jsonify({"error": "No JSON data received"}), 400
+
+#         # Validate required fields
+#         required_fields = ['descriptions', 'timestamps', 'audioFiles', 'videoFileName']
+#         for field in required_fields:
+#             if field not in data or not data[field]:
+#                 return jsonify({"error": f"Missing required field: {field}"}), 400
+
+#         descriptions = data['descriptions']
+#         timestamps = data['timestamps']
+#         audio_files = data['audioFiles']
+#         video_file_name = data['videoFileName']
+
+#         # Validate array lengths
+#         if len(descriptions) != len(timestamps):
+#             return jsonify({"error": "Descriptions and timestamps arrays must be the same length"}), 400
+
+#         # Filter non-TALKING segments with audio files
+#         filtered_segments = []
+#         audio_index = 0
+#         for i, desc in enumerate(descriptions):
+#             if desc.strip().upper() != "TALKING":
+#                 try:
+#                     start, end = timestamps[i]
+#                     audio_file = audio_files[audio_index]
+#                     audio_index += 1
+                    
+#                     filtered_segments.append({
+#                         "start_ts": start,
+#                         "end_ts": end,
+#                         "audio": audio_file,
+#                         "description": desc
+#                     })
+#                 except IndexError:
+#                     return jsonify({"error": "Mismatch between audio files and non-TALKING descriptions"}), 400
+
+#         # Generate SRT file
+#         srt_content = []
+#         for i, seg in enumerate(filtered_segments, 1):
+#             start = seg["start_ts"].replace(".", ",")
+#             end = seg["end_ts"].replace(".", ",")
+#             srt_content.append(
+#                 f"{i}\n{start} --> {end}\n{seg['description'].strip()}\n"
+#             )
+        
+#         srt_path = create_temp_file("\n".join(srt_content), ".srt")
+#         temp_files.append(srt_path)
+
+#         # Get video path
+#         video_path = os.path.join(UPLOAD_FOLDER, video_file_name)
+#         if not os.path.exists(video_path):
+#             return jsonify({"error": "Video file not found"}), 404
+
+#         # Create temporary output audio file
+#         mixed_audio_path = os.path.join(tempfile.gettempdir(), "mixed_audio.mp3")
+#         temp_files.append(mixed_audio_path)
+
+#         # Prepare audio parameters
+#         audio_clips = [seg["audio"] for seg in filtered_segments]
+#         start_times = [timestamp_to_seconds(seg["start_ts"]) for seg in filtered_segments]
+
+#         # Combine audio files with delays (original function)
+#         combine_audio_with_delays(
+#             audio_files=audio_clips,
+#             seconds_list=start_times,
+#             output_file=mixed_audio_path
+#         )
+
+#         # Encode final video with subtitles
+#         output_filename = f"processed_{video_file_name}"
+#         output_path = os.path.join(PROCESSED_FOLDER, output_filename)
+        
+#         subprocess.run([
+#             "ffmpeg", "-y",
+#             "-i", video_path,
+#             "-i", mixed_audio_path,
+#             "-vf", f"subtitles={srt_path}:force_style='FontName=Arial,FontSize=24'",
+#             "-c:v", "libx264", "-preset", "fast", "-crf", "23",
+#             "-c:a", "aac", "-b:a", "192k",
+#             "-map", "0:v", "-map", "1:a",
+#             output_path
+#         ], check=True)
+
+#         return send_file(
+#             output_path,
+#             as_attachment=True,
+#             download_name=output_filename,
+#             mimetype='video/mp4'
+#         )
+
+#     except subprocess.CalledProcessError as e:
+#         return jsonify({
+#             "error": "Video processing failed",
+#             "details": e.stderr.decode() if e.stderr else str(e)
+#         }), 500
+#     except Exception as e:
+#         return jsonify({"error": str(e)}), 500
+#     finally:
+#         cleanup_temp_files(temp_files)
+
+# # Original function unchanged
+# def combine_audio_with_delays(audio_files, seconds_list, output_file):
+#     """
+#     Combines a list of audio files into a single audio track with specified delays.
+#     """
+#     if len(audio_files) != len(seconds_list):
+#         raise ValueError("The number of audio files must match the number of delay values.")
+
+#     # Create a complex filter for ffmpeg
+#     filter_complex = ""
+#     inputs = []
+#     for i, (audio_file, delay) in enumerate(zip(audio_files, seconds_list)):
+#         inputs.extend(["-i", audio_file])
+#         filter_complex += f"[{i}:a]adelay={int(delay * 1000)}|{int(delay * 1000)}[a{i}];"
+
+#     # Concatenate all delayed audio streams
+#     filter_complex += "".join([f"[a{i}]" for i in range(len(audio_files))]) + f"amix=inputs={len(audio_files)}:duration=longest[aout]"
+
+#     # Build the ffmpeg command
+#     ffmpeg_command = [
+#         "ffmpeg",
+#         *inputs,
+#         "-filter_complex", filter_complex,
+#         "-map", "[aout]",
+#         output_file
+#     ]
+
+#     # Execute the ffmpeg command
+#     subprocess.run(ffmpeg_command, check=True)
+
+# # Helper functions
+# # def timestamp_to_seconds(ts):
+# #     """Convert HH:MM:SS.ms timestamp to total seconds"""
+# #     parts = re.split(r"[:.]", ts.replace(",", "."))
+# #     if len(parts) < 3:
+# #         raise ValueError(f"Invalid timestamp format: {ts}")
+    
+# #     hours = float(parts[0]) if len(parts) > 3 else 0
+# #     minutes = float(parts[-3])
+# #     seconds = float(parts[-2])
+# #     milliseconds = float(parts[-1])/1000
+    
+# #     return hours*3600 + minutes*60 + seconds + milliseconds
+
+# def create_temp_file(content, suffix):
+#     """Create a temporary file with content"""
+#     with tempfile.NamedTemporaryFile(mode="w", suffix=suffix, delete=False) as f:
+#         f.write(content)
+#         return f.name
+
+# def cleanup_temp_files(paths):
+#     """Clean up temporary files"""
+#     for path in paths:
+#         try:
+#             if path and os.path.exists(path):
+#                 os.remove(path)
+#         except Exception:
+#             pass
+
 @app.route("/encode-video-with-subtitles", methods=["POST"])
 def encode_video_with_subtitles():
     UPLOAD_FOLDER = "uploads"
@@ -343,13 +511,39 @@ def encode_video_with_subtitles():
                 except IndexError:
                     return jsonify({"error": "Mismatch between audio files and non-TALKING descriptions"}), 400
 
+        # Process audio clips to fit in timestamps
+        for seg in filtered_segments:
+            try:
+                start = int(seg["start_ts"])
+                end = int(seg["end_ts"])
+                desired_duration_ms = end - start
+                
+                if desired_duration_ms <= 0:
+                    raise ValueError("End timestamp must be after start timestamp")
+                
+                original_audio = seg["audio"]
+                original_duration_ms = get_audio_duration(original_audio) * 1000
+                
+                if original_duration_ms > desired_duration_ms:
+                    speed_factor = original_duration_ms / desired_duration_ms
+                    # Create temporary sped-up audio file
+                    with tempfile.NamedTemporaryFile(suffix=".mp3", delete=False) as temp_file:
+                        temp_path = temp_file.name
+                    temp_files.append(temp_path)
+                    speed_up_audio(original_audio, speed_factor, temp_path)
+                    seg["audio"] = temp_path
+
+            except Exception as e:
+                cleanup_temp_files(temp_files)
+                return jsonify({"error": f"Audio processing failed: {str(e)}"}), 500
+
         # Generate SRT file
         srt_content = []
         for i, seg in enumerate(filtered_segments, 1):
-            start = seg["start_ts"].replace(".", ",")
-            end = seg["end_ts"].replace(".", ",")
+            start_srt = milliseconds_to_srt_time(seg["start_ts"])
+            end_srt = milliseconds_to_srt_time(seg["end_ts"])
             srt_content.append(
-                f"{i}\n{start} --> {end}\n{seg['description'].strip()}\n"
+                f"{i}\n{start_srt} --> {end_srt}\n{seg['description'].strip()}\n"
             )
         
         srt_path = create_temp_file("\n".join(srt_content), ".srt")
@@ -368,7 +562,7 @@ def encode_video_with_subtitles():
         audio_clips = [seg["audio"] for seg in filtered_segments]
         start_times = [timestamp_to_seconds(seg["start_ts"]) for seg in filtered_segments]
 
-        # Combine audio files with delays (original function)
+        # Combine audio files with delays
         combine_audio_with_delays(
             audio_files=audio_clips,
             seconds_list=start_times,
@@ -407,64 +601,95 @@ def encode_video_with_subtitles():
     finally:
         cleanup_temp_files(temp_files)
 
-# Original function unchanged
-def combine_audio_with_delays(audio_files, seconds_list, output_file):
-    """
-    Combines a list of audio files into a single audio track with specified delays.
-    """
-    if len(audio_files) != len(seconds_list):
-        raise ValueError("The number of audio files must match the number of delay values.")
+def speed_up_audio(input_path, speed_factor, output_path):
+    """Speed up audio using ffmpeg's atempo filter with chaining for factors > 2.0"""
+    if speed_factor < 1.0:
+        raise ValueError("Speed factor must be >= 1.0")
+    
+    atempo_filters = []
+    while speed_factor > 2.0:
+        atempo_filters.append("atempo=2.0")
+        speed_factor /= 2.0
+    if speed_factor != 1.0:
+        atempo_filters.append(f"atempo={speed_factor}")
+    
+    if not atempo_filters:
+        # No speed change needed, copy the file
+        subprocess.run(["ffmpeg", "-y", "-i", input_path, "-c", "copy", output_path], check=True)
+        return
 
-    # Create a complex filter for ffmpeg
-    filter_complex = ""
-    inputs = []
-    for i, (audio_file, delay) in enumerate(zip(audio_files, seconds_list)):
-        inputs.extend(["-i", audio_file])
-        filter_complex += f"[{i}:a]adelay={int(delay * 1000)}|{int(delay * 1000)}[a{i}];"
+    filter_str = ",".join(atempo_filters)
+    subprocess.run([
+        "ffmpeg", "-y",
+        "-i", input_path,
+        "-filter:a", filter_str,
+        "-c:a", "libmp3lame",
+        "-q:a", "2",
+        output_path
+    ], check=True)
 
-    # Concatenate all delayed audio streams
-    filter_complex += "".join([f"[a{i}]" for i in range(len(audio_files))]) + f"amix=inputs={len(audio_files)}:duration=longest[aout]"
-
-    # Build the ffmpeg command
-    ffmpeg_command = [
-        "ffmpeg",
-        *inputs,
-        "-filter_complex", filter_complex,
-        "-map", "[aout]",
-        output_file
+def get_audio_duration(file_path):
+    """Get audio duration in seconds using ffprobe"""
+    cmd = [
+        "ffprobe",
+        "-v", "error",
+        "-show_entries", "format=duration",
+        "-of", "default=noprint_wrappers=1:nokey=1",
+        file_path
     ]
+    result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    if result.returncode != 0:
+        raise RuntimeError(f"Failed to get audio duration: {result.stderr}")
+    return float(result.stdout.strip())
 
-    # Execute the ffmpeg command
-    subprocess.run(ffmpeg_command, check=True)
+def milliseconds_to_srt_time(ms):
+    """Convert milliseconds to SRT timestamp format (HH:MM:SS,mmm)"""
+    ms = int(ms)
+    hours = ms // 3600000
+    ms %= 3600000
+    minutes = ms // 60000
+    ms %= 60000
+    seconds = ms // 1000
+    milliseconds = ms % 1000
+    return f"{hours:02d}:{minutes:02d}:{seconds:02d},{milliseconds:03d}"
 
-# Helper functions
-def timestamp_to_seconds(ts):
-    """Convert HH:MM:SS.ms timestamp to total seconds"""
-    parts = re.split(r"[:.]", ts.replace(",", "."))
-    if len(parts) < 3:
-        raise ValueError(f"Invalid timestamp format: {ts}")
-    
-    hours = float(parts[0]) if len(parts) > 3 else 0
-    minutes = float(parts[-3])
-    seconds = float(parts[-2])
-    milliseconds = float(parts[-1])/1000
-    
-    return hours*3600 + minutes*60 + seconds + milliseconds
+def timestamp_to_seconds(ms):
+    """Convert milliseconds timestamp to total seconds"""
+    return ms / 1000.0
 
+# Helper functions remain unchanged
 def create_temp_file(content, suffix):
-    """Create a temporary file with content"""
     with tempfile.NamedTemporaryFile(mode="w", suffix=suffix, delete=False) as f:
         f.write(content)
         return f.name
 
 def cleanup_temp_files(paths):
-    """Clean up temporary files"""
     for path in paths:
         try:
             if path and os.path.exists(path):
                 os.remove(path)
         except Exception:
             pass
+
+def combine_audio_with_delays(audio_files, seconds_list, output_file):
+    if len(audio_files) != len(seconds_list):
+        raise ValueError("The number of audio files must match the number of delay values.")
+
+    filter_complex = ""
+    inputs = []
+    for i, (audio_file, delay) in enumerate(zip(audio_files, seconds_list)):
+        inputs.extend(["-i", audio_file])
+        filter_complex += f"[{i}:a]adelay={int(delay * 1000)}|{int(delay * 1000)}[a{i}];"
+
+    filter_complex += "".join([f"[a{i}]" for i in range(len(audio_files))]) + f"amix=inputs={len(audio_files)}:duration=longest[aout]"
+
+    subprocess.run([
+        "ffmpeg",
+        *inputs,
+        "-filter_complex", filter_complex,
+        "-map", "[aout]",
+        output_file
+    ], check=True)
 
 
 @app.route("/text-to-speech", methods=["POST"])
