@@ -83,6 +83,41 @@ const Workspace3: React.FC = () => {
     }
   }, [videoDescriptions]);
 
+  // const handleProcessVideo = async (videoFile: File, action: string) => {
+  //   const formData = new FormData();
+  //   formData.append("action", action);
+  //   formData.append("video", videoFile);
+
+  //   try {
+  //     const response = await fetch("http://localhost:5000/process-video", {
+  //       method: "POST",
+  //       body: formData,
+  //     });
+
+  //     if (response.ok) {
+  //       const result = await response.json();
+  //       console.log(result);
+  //       const videoDescriptionItems: VideoDescriptionItem[] =
+  //         result.timestamps.map(
+  //           ([startTime, endTime]: [string, string], index: number) => ({
+  //             startTime: timestampToMilliseconds(startTime),
+  //             endTime: timestampToMilliseconds(endTime),
+  //             description:
+  //               result.descriptions[index] || "No description available",
+  //             audioFile: result.audio_files[index] || undefined,
+  //           })
+  //         );
+  //       setPreviousDescriptions(videoDescriptionItems);
+  //       setVideoDescriptions(videoDescriptionItems);
+  //       console.log("Video Description Items:", videoDescriptionItems);
+  //     } else {
+  //       alert("Error processing video");
+  //     }
+  //   } catch (error) {
+  //     alert("Error connecting to backend");
+  //   }
+  // };
+
   const handleProcessVideo = async (videoFile: File, action: string) => {
     const formData = new FormData();
     formData.append("action", action);
@@ -96,11 +131,12 @@ const Workspace3: React.FC = () => {
 
       if (response.ok) {
         const result = await response.json();
+        console.log(result);
         const videoDescriptionItems: VideoDescriptionItem[] =
           result.timestamps.map(
-            ([startTime, endTime]: [string, string], index: number) => ({
-              startTime: timestampToMilliseconds(startTime),
-              endTime: timestampToMilliseconds(endTime),
+            ([startTime, endTime]: [number, number], index: number) => ({
+              startTime: startTime,
+              endTime: endTime,
               description:
                 result.descriptions[index] || "No description available",
               audioFile: result.audio_files[index] || undefined,
@@ -122,6 +158,7 @@ const Workspace3: React.FC = () => {
       alert("No video specified");
       return;
     }
+    console.log("Descriptions:", videoDescriptions);
 
     // Prepare timestamps with normalization
     const formatTimestamp = (item: VideoDescriptionItem) =>

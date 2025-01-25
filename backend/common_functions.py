@@ -15,7 +15,9 @@ def convert_text_to_speech(text, output_folder, output_file_name):
         str: The path to the saved MP3 file or an error message.
     """
     try:
-        tts = gTTS(text=text, lang="en")
+        tts = gTTS(text=text, lang="en", )
+        #speed up the speech
+        tts.rate = 100
         audio_file_path = os.path.join(output_folder, f"{output_file_name}.mp3")
         tts.save(audio_file_path)
         return audio_file_path  # Return the file path of the generated audio

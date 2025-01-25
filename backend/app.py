@@ -474,17 +474,20 @@ def text_to_speech():
 
     if not data or not isinstance(data, list):
         return jsonify({"error": "Descriptions must be provided as a list."}), 400
-
+    print("Data:", data)
     try:
         audio_files = []
         for item in data:
+            print("Item:", item)
             description = item.get("description")
             timestamps = item.get("timestamps")
             scene_id = item.get("scene_id")
             unique_id = str(uuid.uuid4())
-
-            if not description or not timestamps or not scene_id:
-                return jsonify({"error": "Each item must have description, timestamps, and scene_id."}), 400
+            print("Description:", description)
+            print("Timestamps:", timestamps)
+            print("Scene ID:", scene_id)
+            # if not description or not timestamps or not scene_id:
+            #     return jsonify({"error": "Each item must have description, timestamps, and scene_id."}), 400
 
             start_time, end_time = timestamps  # Unpack the timestamps
 

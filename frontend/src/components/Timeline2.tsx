@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import Draggable from "react-draggable";
+import { Rnd } from "react-rnd";
 
 interface TimelineVisualizerProps {
   videoDescriptions: VideoDescriptionItem[];
@@ -106,60 +106,13 @@ const TimelineVisualizer: React.FC<TimelineVisualizerProps> = ({
     updateAudioVolume(audioVolume);
   }, [audioVolume]);
 
-  // const updateContainers = (updatedElements: TimelineElement[]) => {
-  //   const sortedElements = [...updatedElements].sort(
-  //     (a, b) => a.position - b.position
-  //   );
-
-  //   const newContainers = sortedElements.map((element, index) => {
-  //     if (element.text === "TALKING") {
-  //       return {
-  //         id: element.id,
-  //         startPosition: element.position,
-  //         width: element.width,
-  //         element: element,
-  //       };
-  //     }
-
-  //     const previousElement =
-  //       index > 0 && sortedElements[index - 1].text !== "TALKING"
-  //         ? sortedElements[index - 1]
-  //         : null;
-
-  //     const containerStart =
-  //       previousElement && previousElement.text !== "TALKING"
-  //         ? previousElement.position + previousElement.width
-  //         : element.position;
-
-  //     const nextElement =
-  //       index < sortedElements.length - 1 &&
-  //       sortedElements[index + 1].text !== "TALKING"
-  //         ? sortedElements[index + 1]
-  //         : null;
-
-  //     const containerWidth = nextElement
-  //       ? nextElement.position - containerStart
-  //       : timelineWidth - containerStart;
-
-  //     return {
-  //       id: element.id,
-  //       startPosition: containerStart,
-  //       width: containerWidth,
-  //       element: element,
-  //     };
-  //   });
-
-  //   setContainers(newContainers);
-  // };
-
   const updateContainers = (updatedElements: TimelineElement[]) => {
     const sortedElements = [...updatedElements].sort(
       (a, b) => a.position - b.position
     );
-  
+
     const newContainers = sortedElements.map((element, index) => {
       if (element.text === "TALKING") {
-        // TALKING elements are fixed and act as boundaries
         return {
           id: element.id,
           startPosition: element.position,
@@ -167,29 +120,24 @@ const TimelineVisualizer: React.FC<TimelineVisualizerProps> = ({
           element: element,
         };
       }
-  
-      // Find the previous boundary (end position of the previous element)
-      let prevBoundary = 0; // Default to 0 if no previous element exists
+
+      let prevBoundary = 0;
       for (let i = index - 1; i >= 0; i--) {
         const prevElement = sortedElements[i];
-        // Use the end position of the previous element as the boundary
         prevBoundary = prevElement.position + prevElement.width;
-        break; // Stop after finding the first previous element
+        break;
       }
-  
-      // Find the next boundary (start position of the next element)
-      let nextBoundary = timelineWidth; // Default to timeline width if no next element exists
+
+      let nextBoundary = timelineWidth;
       for (let i = index + 1; i < sortedElements.length; i++) {
         const nextElement = sortedElements[i];
-        // Use the start position of the next element as the boundary
         nextBoundary = nextElement.position;
-        break; // Stop after finding the first next element
+        break;
       }
-  
-      // Calculate the container start and width
-      const containerStart = Math.min(prevBoundary, element.position); // Ensure the container doesn't overlap with the previous element
-      const containerWidth = nextBoundary - containerStart; // Ensure the container doesn't overlap with the next element
-  
+
+      const containerStart = Math.min(prevBoundary, element.position);
+      const containerWidth = nextBoundary - containerStart;
+
       return {
         id: element.id,
         startPosition: containerStart,
@@ -197,7 +145,7 @@ const TimelineVisualizer: React.FC<TimelineVisualizerProps> = ({
         element: element,
       };
     });
-  
+
     setContainers(newContainers);
   };
 
@@ -260,8 +208,28 @@ const TimelineVisualizer: React.FC<TimelineVisualizerProps> = ({
     });
   };
 
+  // useEffect(() => {
+  //   setTimelineWidth(videoduration * 100);
+  // }, [videoduration]);
+
   useEffect(() => {
-    setTimelineWidth(videoduration * 100);
+    if (videoduration) {
+      setTimelineWidth(videoduration * 100);
+    } else {
+      setTimelineWidth(window.innerWidth);
+    }
+
+    const handleResize = () => {
+      if (!videoduration) {
+        setTimelineWidth(window.innerWidth);
+      }
+    };
+
+    window.addEventListener("resize", handleResize);
+
+    return () => {
+      window.removeEventListener("resize", handleResize);
+    };
   }, [videoduration]);
 
   useEffect(() => {
@@ -278,6 +246,29 @@ const TimelineVisualizer: React.FC<TimelineVisualizerProps> = ({
     setElements(newElements);
     updateContainers(newElements);
   }, [videoDescriptions, timelineWidth]);
+
+  const handleDrag = (elementId: number, newPosition: number) => {
+    if (resizingRef.current) return;
+
+    const newElements = elements.map((el) => {
+      if (el.id === elementId) {
+        const newStartTime = newPosition * 10; // Convert pixels to ms
+        const endPosition = newPosition + el.width;
+        const newEndTime = endPosition * 10; // Convert pixels to ms
+
+        return {
+          ...el,
+          position: newPosition,
+          startTime: newStartTime,
+          endTime: newEndTime,
+        };
+      }
+      return el;
+    });
+
+    setElements(newElements);
+    updateContainers(newElements);
+  };
 
   const handleDragStop = (elementId: number, newPosition: number) => {
     if (resizingRef.current) return;
@@ -312,48 +303,109 @@ const TimelineVisualizer: React.FC<TimelineVisualizerProps> = ({
     onDescriptionChange(updatedDescriptions);
   };
 
-  const handleResize = (elementId: number, delta: number) => {
-    if (isDragging) return;
+  const handleResize = (
+    elementId: number,
+    direction: string,
+    ref: HTMLElement,
+    delta: { width: number; height: number },
+    position: { x: number; y: number }
+  ) => {
+    const container = containers.find((c) => c.id === elementId);
+    if (!container) return;
 
-    setElements((prevElements) => {
-      const currentElement = prevElements.find((e) => e.id === elementId);
-      if (!currentElement) return prevElements;
+    // Get actual pixel dimensions from the element
+    const currentWidth = parseFloat(ref.style.width);
+    const currentLeft = parseFloat(ref.style.left);
+    console.log("currentWidth", currentWidth);
+    console.log("currentLeft", position["x"]);
 
-      const nextElement = [...prevElements]
-        .sort((a, b) => a.position - b.position)
-        .find((e) => e.position > currentElement.position);
+    console.log("console startposition", container.startPosition);
+    // Convert to timeline-absolute coordinates
+    const absolutePosition = container.startPosition + position["x"];
+    const absoluteRight = absolutePosition + currentWidth;
 
-      const maxWidth = nextElement
-        ? nextElement.position - currentElement.position
-        : timelineWidth - currentElement.position;
+    console.log("console absolutePosition", absolutePosition);
 
-      const newWidth = Math.min(
-        Math.max(50, currentElement.width + delta),
-        maxWidth
+    // Find neighboring elements
+    const sortedElements = [...elements].sort(
+      (a, b) => a.position - b.position
+    );
+    const currentIndex = sortedElements.findIndex((e) => e.id === elementId);
+
+    // Calculate boundaries
+    const prevElement = sortedElements[currentIndex - 1];
+    const nextElement = sortedElements[currentIndex + 1];
+
+    const minPosition = prevElement
+      ? prevElement.position + prevElement.width
+      : 0;
+    const maxPosition = nextElement ? nextElement.position : timelineWidth;
+
+    // Calculate new dimensions
+    let newWidth = currentWidth;
+    let newPosition = absolutePosition;
+
+    if (direction === "right") {
+      newWidth = Math.min(
+        Math.max(50, absoluteRight - newPosition),
+        maxPosition - newPosition
       );
+    } else if (direction === "left") {
+      newPosition = Math.max(minPosition, absolutePosition);
+      newWidth = Math.min(
+        Math.max(50, absoluteRight - newPosition),
+        maxPosition - newPosition
+      );
+    }
 
-      const newElements = prevElements.map((el) => {
-        if (el.id === elementId) {
-          const newEndTime = (el.position + newWidth) * 10; // Convert pixels to ms
-          return { ...el, width: newWidth, endTime: newEndTime };
-        }
-        return el;
-      });
+    // Update elements
+    const newElements = elements.map((el) =>
+      el.id === elementId
+        ? {
+            ...el,
+            position: newPosition,
+            width: newWidth,
+            startTime: newPosition * 10,
+            endTime: (newPosition + newWidth) * 10,
+          }
+        : el
+    );
 
-      updateContainers(newElements);
-
-      const updatedDescriptions = newElements.map((el) => ({
-        startTime: el.startTime,
-        endTime: el.endTime,
-        description: el.text,
-        audioFile: el.audioFile,
-      }));
-
-      onDescriptionChange(updatedDescriptions);
-
-      return newElements;
-    });
+    setElements(newElements);
+    updateContainers(newElements); // Update containers in real-time
   };
+
+  // const handleTimelineClick = (e: React.MouseEvent<HTMLDivElement>) => {
+  //   if (!timelineRef.current || !onTimeUpdate) return;
+
+  //   const rect = timelineRef.current.getBoundingClientRect();
+  //   const scrollLeft = timelineRef.current.scrollLeft;
+  //   const x = e.clientX - rect.left + scrollLeft;
+
+  //   const newTime = x / 100;
+
+  //   for (const container of containers) {
+  //     const startSeconds = container.element.startTime;
+  //     const endSeconds = container.element.endTime;
+
+  //     if (newTime >= startSeconds && newTime < endSeconds) {
+  //       const audio = audioRef.current[container.id];
+  //       if (audio) {
+  //         const audioOffset = newTime - startSeconds;
+  //         if (audioOffset < audio.duration) {
+  //           audio.currentTime = audioOffset;
+  //         } else {
+  //           console.warn(
+  //             `Audio offset (${audioOffset}) exceeds duration (${audio.duration})`
+  //           );
+  //         }
+  //       }
+  //       break;
+  //     }
+  //   }
+
+  //   onTimeUpdate(newTime);
+  // };
 
   const handleTimelineClick = (e: React.MouseEvent<HTMLDivElement>) => {
     if (!timelineRef.current || !onTimeUpdate) return;
@@ -362,14 +414,14 @@ const TimelineVisualizer: React.FC<TimelineVisualizerProps> = ({
     const scrollLeft = timelineRef.current.scrollLeft;
     const x = e.clientX - rect.left + scrollLeft;
 
-    const newTime = x / 100;
+    const newTime = x / 100; // Convert pixels to seconds
 
-    for (const container of containers) {
-      const startSeconds = container.element.startTime;
-      const endSeconds = container.element.endTime;
+    for (const element of elements) {
+      const startSeconds = element.startTime / 1000; // Convert ms to seconds
+      const endSeconds = element.endTime / 1000; // Convert ms to seconds
 
       if (newTime >= startSeconds && newTime < endSeconds) {
-        const audio = audioRef.current[container.id];
+        const audio = audioRef.current[element.id];
         if (audio) {
           const audioOffset = newTime - startSeconds;
           if (audioOffset < audio.duration) {
@@ -387,45 +439,101 @@ const TimelineVisualizer: React.FC<TimelineVisualizerProps> = ({
     onTimeUpdate(newTime);
   };
 
+  // // Audio Playback handling
+  // useEffect(() => {
+  //   elements.forEach((element) => {
+  //     const audio = audioRef.current[element.id];
+  //     if (!audio || !element.audioFile) return;
+
+  //     const elementStartTime = element.startTime;
+  //     const elementEndTime = element.endTime;
+  //     console.log(`comparison : ${currentTime} >= ${elementStartTime} && ${currentTime} < ${elementEndTime}`);
+
+  //     if (currentTime >= elementStartTime && currentTime < elementEndTime) {
+  //       const audioOffset = currentTime - elementStartTime;
+
+  //       if (audio.paused && isPlaying) {
+  //         audio.currentTime = audioOffset;
+  //         const timeRemaining = Math.min(
+  //           audio.duration - audioOffset,
+  //           elementEndTime - currentTime
+  //         );
+
+  //         audio
+  //           .play()
+  //           .then(() => {
+  //             setTimeout(() => {
+  //               if (!audio.paused) {
+  //                 audio.pause();
+  //               }
+  //             }, timeRemaining * 1000);
+  //           })
+  //           .catch((error) => console.error("Audio playback error:", error));
+  //       }
+  //     } else if (!audio.paused) {
+  //       audio.pause();
+  //     }
+  //   });
+  // }, [currentTime, elements, isPlaying]);
+
+  // useEffect(() => {
+  //   elements.forEach((element) => {
+  //     const audio = audioRef.current[element.id];
+  //     if (!audio || !element.audioFile) return;
+
+  //     const elementStartTime = element.startTime / 1000; // Convert ms to seconds
+  //     const elementEndTime = element.endTime / 1000; // Convert ms to seconds
+
+  //     if (currentTime >= elementStartTime && currentTime < elementEndTime) {
+  //       const audioOffset = currentTime - elementStartTime;
+
+  //       if (isPlaying && audio.paused) {
+  //         audio.currentTime = audioOffset;
+  //         audio
+  //           .play()
+  //           .catch((error) => console.error("Audio playback error:", error));
+  //       } else if (!isPlaying && !audio.paused) {
+  //         audio.pause();
+  //       }
+  //     } else {
+  //       audio.pause();
+  //     }
+  //   });
+  // }, [currentTime, elements, isPlaying]);
+
   useEffect(() => {
     elements.forEach((element) => {
       const audio = audioRef.current[element.id];
       if (!audio || !element.audioFile) return;
 
-      const elementStartTime = element.startTime;
-      const elementEndTime = element.endTime;
+      const elementStartTime = element.startTime / 1000; // Convert ms to seconds
+      const elementEndTime = element.endTime / 1000; // Convert ms to seconds
+      const audioDuration = audioDurations[element.id] || 0;
 
       if (currentTime >= elementStartTime && currentTime < elementEndTime) {
         const audioOffset = currentTime - elementStartTime;
 
-        if (audio.paused && isPlaying) {
-          audio.currentTime = audioOffset;
-          const timeRemaining = Math.min(
-            audio.duration - audioOffset,
-            elementEndTime - currentTime
-          );
-
-          audio
-            .play()
-            .then(() => {
-              setTimeout(() => {
-                if (!audio.paused) {
-                  audio.pause();
-                }
-              }, timeRemaining * 1000);
-            })
-            .catch((error) => console.error("Audio playback error:", error));
+        if (audioOffset <= audioDuration) {
+          if (isPlaying && audio.paused) {
+            audio.currentTime = audioOffset;
+            audio
+              .play()
+              .catch((error) => console.error("Audio playback error:", error));
+          } else if (!isPlaying && !audio.paused) {
+            audio.pause();
+          }
+        } else {
+          audio.pause();
         }
-      } else if (!audio.paused) {
+      } else {
         audio.pause();
       }
     });
-  }, [currentTime, elements, isPlaying]);
+  }, [currentTime, elements, isPlaying, audioDurations]);
 
   const handleAudioMetadata = (id: number, duration: number) => {
     setAudioDurations((prev) => ({ ...prev, [id]: duration }));
   };
-
   useEffect(() => {
     if (!timelineRef.current) return;
 
@@ -443,176 +551,160 @@ const TimelineVisualizer: React.FC<TimelineVisualizerProps> = ({
   }, [currentTime, containerWidth]);
 
   return (
-    <div>
-      <div
-        className="relative h-40 bg-gray-800 overflow-hidden"
-        ref={timelineRef}
-        onWheel={handleWheel}
-        style={{ cursor: "grab", width: "100%" }}
+    <div
+      className="relative w-full h-40 overflow-hidden bg-gray-900"
+      ref={timelineRef}
+      onWheel={handleWheel}
+      style={{ cursor: "grab" }}
+    >
+      {/* Add Scene Button */}
+      <button
+        className="absolute z-20 text-white rounded-full p-3 shadow-lg transition-transform transform hover:scale-105"
+        style={{
+          left: `${currentTime * 100 - 16}px`,
+          top: "-24px",
+          background: "linear-gradient(to right, #14b8a6, #0f766e)", // Teal gradient
+        }}
+        onClick={addNewScene}
       >
-        <button
-          className="absolute z-20 bg-green-600 text-white rounded-full p-2 shadow-lg hover:bg-green-700 transition"
-          style={{
-            left: `${currentTime * 100 - 16}px`,
-            top: "-24px",
-          }}
-          onClick={addNewScene}
-        >
-          +
-        </button>
+        +
+      </button>
+
+      {/* Timeline Container */}
+      <div className="relative h-full" style={{ width: `${timelineWidth}px` }}>
+        {/* Clickable Background */}
         <div
-          className="relative h-full"
-          style={{ width: `${timelineWidth}px` }}
-        >
-          <div className="absolute inset-0" onClick={handleTimelineClick} />
+          className="absolute inset-0"
+          onClick={handleTimelineClick}
+          style={{ backgroundColor: "rgba(0, 0, 0, 0.1)" }}
+        />
 
-          {/* Time markers */}
-          <div className="absolute top-0 left-0 w-full h-full pointer-events-none">
-            {Array.from({ length: Math.ceil(timelineWidth / 100) }).map(
-              (_, index) => (
-                <div
-                  key={index}
-                  className="absolute h-full border-l border-gray-500"
-                  style={{ left: `${index * 100}px` }}
-                >
-                  <span className="text-gray-400 text-xs absolute top-1">
-                    {pixelsToTime(index * 100)}
-                  </span>
-                </div>
-              )
-            )}
+        {/* Time Markers */}
+        <div className="absolute top-0 left-0 w-full h-full pointer-events-none">
+          {Array.from({ length: Math.ceil(timelineWidth / 100) }).map(
+            (_, index) => (
+              <div
+                key={index}
+                className="absolute h-full border-l border-gray-700"
+                style={{ left: `${index * 100}px` }}
+              >
+                <span className="text-xs absolute top-1 text-gray-400">
+                  {pixelsToTime(index * 100)}
+                </span>
+              </div>
+            )
+          )}
 
-            {/* Red bar for current time */}
-            <div
-              className="absolute h-full w-0.5 bg-red-500 z-10"
-              style={{ left: `${currentTime * 100}px` }}
-            />
-          </div>
-          {/* Containers and draggable elements */}
-          {containers.map(({ id, startPosition, width, element }) => (
-            <div
-              key={id}
-              className="absolute inset-y-0 my-auto h-16"
-              style={{
-                left: `${startPosition}px`,
-                width: `${width}px`,
-              }}
-              onClick={(e) => e.stopPropagation()}
-            >
-              {element.text === "TALKING" ? (
-                // Fixed red translucent container for "TALKING" elements
-                <div
-                  className="h-16 bg-red-500 bg-opacity-50 border border-red-700 rounded-lg flex items-center justify-center"
-                  style={{ width: `${element.width}px` }}
-                >
-                  <span className="text-white font-bold text-sm">TALKING</span>
-                </div>
-              ) : (
-                // Draggable container for other elements
-                <Draggable
-                  axis="x"
-                  bounds="parent"
-                  position={{ x: element.position - startPosition, y: 0 }}
-                  onStart={() => setIsDragging(true)}
-                  onStop={(_, data) =>
-                    handleDragStop(id, data.x + startPosition)
-                  }
-                  disabled={resizingRef.current}
-                >
-                  <div
-                    className="h-16 bg-gray-700 border border-gray-600 rounded-lg flex items-center cursor-grab relative"
-                    style={{ width: `${element.width}px` }}
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    {/* Add duration bar at the bottom */}
-                    {element.audioFile && audioDurations[id] && (
-                      <div className="absolute bottom-0 left-0 right-0 h-1 bg-blue-500">
-                        <div
-                          className="h-full bg-green-500"
-                          style={{
-                            width: `${Math.min(
-                              (audioDurations[id] * 100) /
-                                (element.width / 100),
-                              100
-                            )}%`,
-                          }}
-                        />
-                      </div>
-                    )}
-                    <div className="bg-green-600 text-white text-xs font-bold px-2 py-1">
-                      {id}
-                    </div>
-                    <div className="text-gray-200 text-sm px-2 truncate">
-                      {element.text}
-                    </div>
-
-                    {/* Hidden Audio Player for Each Element */}
-                    <audio
-                      ref={(el) => {
-                        audioRef.current[id] = el;
-                        if (el && element.audioFile) {
-                          el.onloadedmetadata = () => {
-                            if (el) handleAudioMetadata(id, el.duration);
-                          };
-                        }
-                      }}
-                      src={`http://localhost:5000/${element.audioFile}`}
-                      preload="auto"
-                    />
-                    <div
-                      className="timelineSentenceHandle"
-                      style={{
-                        position: "absolute",
-                        width: "9px",
-                        height: "100%",
-                        left: `${element.width - 9}px`,
-                        cursor: "col-resize",
-                      }}
-                      onMouseDown={(e) => {
-                        e.stopPropagation();
-                        resizingRef.current = true;
-                        let startX = e.clientX;
-
-                        const onMouseMove = (moveEvent: MouseEvent) => {
-                          const delta = moveEvent.clientX - startX;
-                          handleResize(id, delta);
-                          startX = moveEvent.clientX;
-                        };
-
-                        const onMouseUp = () => {
-                          resizingRef.current = false;
-                          document.removeEventListener(
-                            "mousemove",
-                            onMouseMove
-                          );
-                          document.removeEventListener("mouseup", onMouseUp);
-                        };
-
-                        document.addEventListener("mousemove", onMouseMove);
-                        document.addEventListener("mouseup", onMouseUp);
-                      }}
-                    >
-                      <div
-                        className="timelineResizeHandle"
-                        style={{
-                          textAlign: "center",
-                          userSelect: "none",
-                        }}
-                      >
-                        ☰
-                      </div>
-                    </div>
-                  </div>
-                </Draggable>
-              )}
-            </div>
-          ))}
+          {/* Current Time Indicator */}
+          <div
+            className="absolute h-full w-0.5 z-10 bg-teal-400"
+            style={{
+              left: `${currentTime * 100}px`,
+            }}
+          />
         </div>
-        {visualizer && (
-          <div className="absolute bottom-0 left-0 right-0 bg-black">
-            {visualizer}
+
+        {/* Containers and Draggable Elements */}
+        {containers.map(({ id, startPosition, width, element }) => (
+          <div
+            key={id}
+            className="absolute inset-y-0 my-auto h-80px"
+            style={{
+              left: `${startPosition}px`,
+              width: `${width}px`,
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {element.text === "TALKING" ? (
+              // Fixed "TALKING" Container
+              <div
+                className="h-16 bg-opacity-75 rounded-xl flex items-center justify-center select-none shadow-md"
+                style={{
+                  width: `${element.width}px`,
+                  background: "linear-gradient(to right, #ef4444, #b91c1c)", // Red gradient
+                }}
+              >
+                <span className="font-bold text-sm text-white">TALKING</span>
+              </div>
+            ) : (
+              // Draggable and Resizable Container
+              <Rnd
+                position={{ x: element.position - startPosition, y: 0 }}
+                size={{ width: element.width, height: 80 }}
+                onDrag={(e, d) => handleDrag(id, d.x + startPosition)}
+                onDragStop={(e, d) => handleDragStop(id, d.x + startPosition)}
+                onResize={(e, dir, ref, delta, pos) =>
+                  handleResize(id, dir, ref, delta, pos)
+                }
+                onResizeStop={(e, dir, ref, delta, pos) =>
+                  handleResize(id, dir, ref, delta, pos)
+                }
+                enableResizing={{
+                  left: true,
+                  right: true,
+                  top: false,
+                  bottom: false,
+                }}
+                resizeGrid={[1, 1]}
+                bounds="parent"
+                minWidth={50}
+              >
+                <div
+                  className="h-16 border rounded-xl flex items-center cursor-grab relative select-none shadow-md"
+                  style={{
+                    width: `${element.width}px`,
+                    background: "linear-gradient(to right, #9333ea, #7e22ce)", // Purple gradient
+                    borderColor: "#6d28d9",
+                  }}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {/* Resize Zones */}
+                  <div className="absolute left-0 top-0 bottom-0 w-2.5 bg-purple-600 hover:opacity-50 transition-opacity rounded-l-xl cursor-ew-resize" />
+                  <div className="absolute right-0 top-0 bottom-0 w-2.5 bg-purple-600 hover:opacity-50 transition-opacity rounded-r-xl cursor-ew-resize" />
+
+                  {/* ID Ribbon */}
+                  <div className="absolute top-0 left-0 right-0 text-white text-xs font-bold px-2 py-1 rounded-t-xl text-left bg-purple-700">
+                    {id}
+                  </div>
+
+                  {/* Audio Duration Bar */}
+                  {element.audioFile && audioDurations[id] && (
+                    <div className="absolute bottom-0 left-0 right-0 h-1 bg-purple-600">
+                      <div
+                        className="h-full bg-teal-400"
+                        style={{
+                          width: `${Math.min(
+                            (audioDurations[id] * 100) / (element.width / 100),
+                            100
+                          )}%`,
+                        }}
+                      />
+                    </div>
+                  )}
+
+                  {/* Element Text */}
+                  <div className="text-sm px-2 truncate text-white">
+                    {element.text}
+                  </div>
+
+                  {/* Hidden Audio Player */}
+                  <audio
+                    ref={(el) => {
+                      audioRef.current[element.id] = el;
+                      if (el && element.audioFile) {
+                        el.onloadedmetadata = () => {
+                          if (el) handleAudioMetadata(element.id, el.duration);
+                        };
+                      }
+                    }}
+                    src={`http://localhost:5000/${element.audioFile}`}
+                    preload="auto"
+                  />
+                </div>
+              </Rnd>
+            )}
           </div>
-        )}
+        ))}
       </div>
     </div>
   );

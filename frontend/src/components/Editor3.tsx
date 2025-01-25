@@ -1,5 +1,14 @@
 import React, { useState, useRef, useEffect, ChangeEvent } from "react";
-import { Play, Pause, Settings, Clock, Upload } from "lucide-react";
+import {
+  Play,
+  Pause,
+  Settings,
+  Clock,
+  Upload,
+  Volume,
+  ChevronRight,
+  ChevronLeft,
+} from "lucide-react";
 import TimelineVisualizer from "./Timeline2";
 import TimelineVisualizer2 from "./Timeline2";
 
@@ -49,6 +58,8 @@ const TranscriptionEditor3: React.FC<VideoTimelineProps> = ({
   const [isEncoding, setIsEncoding] = useState<boolean>(false);
   const [videoVolume, setVideoVolume] = useState<number>(1);
   const [audioVolume, setAudioVolume] = useState<number>(1);
+  const [isDescriptionsVisible, setIsDescriptionsVisible] =
+    useState<boolean>(true);
 
   // Add these effects to update media volumes
   useEffect(() => {
@@ -64,8 +75,8 @@ const TranscriptionEditor3: React.FC<VideoTimelineProps> = ({
   }, [audioVolume]);
 
   useEffect(() => {
-    console.log("currentTime:", currentTime);
-    console.log("videoDescriptions:", videoDescriptions);
+    // console.log("currentTime:", currentTime);
+    // console.log("videoDescriptions:", videoDescriptions);
     const currentTimeInSeconds = currentTime;
     const currentScene = videoDescriptions.find(
       (scene) =>
@@ -200,23 +211,64 @@ const TranscriptionEditor3: React.FC<VideoTimelineProps> = ({
   };
 
   return (
-    <div className="max-w-full overflow-hidden bg-gray-50 h-screen">
-      <div className="flex justify-between items-center p-4 bg-gray-800 text-white shadow-md">
+    <div className="max-w-full overflow-hidden bg-gray-50 h-screen flex flex-col">
+      {/* Header */}
+      <div className="flex justify-between items-center p-2 bg-gray-800 text-white shadow-md">
         <div className="flex items-center">
           <button className="mr-2">
-            <Settings className="text-white" />
+            <Settings className="w-5 h-5 text-white" />
           </button>
           <span className="text-lg font-semibold">Transcription Editor</span>
         </div>
+
         <div className="flex items-center">
-          {isProcessing && <span className="mr-2">Processing video...</span>}
-          {isEncoding && <span className="mr-2">Encoding video...</span>}
+          <button
+            className="mr-2 p-1 bg-gray-200 rounded hover:bg-gray-300"
+            onClick={encodeVideo}
+          >
+            Encode
+          </button>
+          <button
+            className="mr-2 p-1 bg-gray-200 rounded hover:bg-gray-300"
+            onClick={analyzeVideo}
+          >
+            Analyze
+          </button>
+          <button
+            className="mr-2 p-1 bg-gray-200 rounded hover:bg-gray-300"
+            onClick={reanalyzeVideo}
+          >
+            Reanalyze
+          </button>
+          <button
+            className="mr-2 p-1 bg-gray-200 rounded hover:bg-gray-300"
+            onClick={handleRegenerateAudio}
+          >
+            Regenerate Audio
+          </button>
+
+          <div className="flex items-center">
+            {isProcessing && <span className="mr-2">Processing video...</span>}
+            {isEncoding && <span className="mr-2">Encoding video...</span>}
+          </div>
         </div>
       </div>
 
-      <div className="grid grid-cols-10 grid-rows-10 h-full">
-        <div className="col-span-5 row-span-7 p-4 bg-white shadow-md overflow-y-auto">
-          <div>
+      {/* Main Content Area */}
+      <div className="flex flex-1 overflow-hidden">
+        {/* Collapsible Descriptions Sidebar */}
+        {isDescriptionsVisible && (
+          <div className="w-1/3 border-r bg-white overflow-y-auto p-4">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-lg font-semibold">Scenes</h2>
+              <button
+                onClick={() => setIsDescriptionsVisible(false)}
+                className="p-1 hover:bg-gray-100 rounded"
+              >
+                <ChevronLeft className="w-5 h-5 text-gray-600" />
+              </button>
+            </div>
+
             {videoDescriptions
               .filter((scene) => scene.description !== "TALKING")
               .map((scene, index) => (
@@ -229,34 +281,52 @@ const TranscriptionEditor3: React.FC<VideoTimelineProps> = ({
                   }`}
                   onClick={() => setSelectedScene(scene.startTime)}
                 >
-                  <div>
-                    {`Scene ${index + 1}: ${(scene.startTime / 1000).toFixed(
-                      3
-                    )}s - ${(scene.endTime / 1000).toFixed(3)}s`}
+                  <div className="flex items-center">
+                    <div>
+                      {`Scene ${index + 1}: ${(scene.startTime / 1000).toFixed(
+                        3
+                      )}s - ${(scene.endTime / 1000).toFixed(3)}s`}
+                    </div>
+                    <div>
+                      <textarea
+                        className="w-full border border-gray-300 rounded p-1 mt-1"
+                        value={scene.description}
+                        onChange={(e) =>
+                          updateSceneText(scene.startTime, e.target.value)
+                        }
+                      />
+                    </div>
                   </div>
-                  <textarea
-                    className="w-full border border-gray-300 rounded p-1 mt-1"
-                    value={scene.description}
-                    onChange={(e) =>
-                      updateSceneText(scene.startTime, e.target.value)
-                    }
-                  />
                 </div>
               ))}
           </div>
-        </div>
+        )}
 
-        <div className="col-span-5 row-span-7 flex flex-col p-4 bg-white shadow-md">
-          <div className="flex-grow mb-4 relative">
+        {/* Video and Controls */}
+        <div className="flex-1 flex flex-col">
+          {/* Button to get descriptions back */}
+          {!isDescriptionsVisible && (
+            <button
+              onClick={() => setIsDescriptionsVisible(true)}
+              className="absolute left-0 top-1/2 -translate-y-1/2 bg-gray-800 text-white px-3 py-2 rounded-r-lg shadow-lg z-10"
+            >
+              <ChevronRight className="w-5 h-5" />
+            </button>
+          )}
+
+          {/* Video Container */}
+          <div className="flex-1 relative">
             {videoFile ? (
-              <>
+              <div className="absolute inset-0 flex items-center justify-center">
                 <video
                   ref={videoRef}
-                  className="w-full rounded-lg shadow-lg"
+                  className="w-full h-full object-contain"
                   src={videoUrl}
                   onLoadedMetadata={handleLoadedMetadata}
                   controls={false}
                 />
+
+                {/* Subtitle Overlay */}
                 <div className="absolute bottom-8 left-0 right-0 flex justify-center">
                   <div className="bg-black bg-opacity-50 px-4 py-2 rounded-lg max-w-2xl text-center">
                     <p className="text-white text-lg font-semibold">
@@ -264,12 +334,12 @@ const TranscriptionEditor3: React.FC<VideoTimelineProps> = ({
                     </p>
                   </div>
                 </div>
-              </>
+              </div>
             ) : (
-              <div className="flex items-center justify-center h-full">
+              <div className="absolute inset-0 flex items-center justify-center">
                 <label className="flex items-center cursor-pointer">
-                  <Upload className="mr-2" />
-                  <span className="text-lg">Upload Video</span>
+                  <Upload className="w-5 h-5 mr-2" />
+                  <span className="text-lg text-white">Upload Video</span>
                   <input
                     type="file"
                     className="hidden"
@@ -282,170 +352,60 @@ const TranscriptionEditor3: React.FC<VideoTimelineProps> = ({
             )}
           </div>
 
-          <div className="flex items-center mb-2 col-span-6">
-            <div>
-              {/* Play/Pause button */}
-              <div>
-                <button
-                  className="mr-2 p-2 bg-gray-200 rounded hover:bg-gray-300 w-full"
-                  onClick={togglePlayPause}
-                >
-                  {isPlaying ? (
-                    <Pause className="text-black" />
-                  ) : (
-                    <Play className="text-black" />
-                  )}
-                </button>
-              </div>
-
-              {/* Video Volume Slider */}
-              <div className="flex items-center mr-4">
-                <span className="mr-2">Video:</span>
-                <input
-                  type="range"
-                  min="0"
-                  max="1"
-                  step="0.1"
-                  value={videoVolume}
-                  onChange={(e) => setVideoVolume(parseFloat(e.target.value))}
-                  className="w-24"
-                />
-              </div>
-
-              {/* Audio Volume Slider */}
-              <div className="flex items-center mr-4">
-                <span className="mr-2">Audio:</span>
-                <input
-                  type="range"
-                  min="0"
-                  max="1"
-                  step="0.1"
-                  value={audioVolume}
-                  onChange={(e) => setAudioVolume(parseFloat(e.target.value))}
-                  className="w-24"
-                />
-              </div>
-
-              {/* Time display */}
-              <div className="flex items-center">
-                <Clock className="mr-1" />
-                <span>
-                  {currentTime.toFixed(3)}s / {videoDuration.toFixed(3)}s
-                </span>
-              </div>
-            </div>
-            <div>
-              <button
-                className="mr-2 p-2 bg-gray-200 rounded hover:bg-gray-300"
-                onClick={encodeVideo}
-              >
-                Encode
-              </button>
-              <button
-                className="mr-2 p-2 bg-gray-200 rounded hover:bg-gray-300"
-                onClick={analyzeVideo}
-              >
-                Analyze
-              </button>
-              <button
-                className="mr-2 p-2 bg-gray-200 rounded hover:bg-gray-300"
-                onClick={reanalyzeVideo}
-              >
-                Reanalyze
-              </button>
-              <button
-                className="mr-2 p-2 bg-gray-200 rounded hover:bg-gray-300"
-                onClick={handleRegenerateAudio}
-              >
-                Regenerate Audio
-              </button>
-              <div className="w-full mb-4">
-                <input
-                  type="range"
-                  min="0"
-                  max={videoDuration || 0}
-                  step="0.1"
-                  value={currentTime}
-                  onChange={(e) =>
-                    handleTimelineUpdate(parseFloat(e.target.value))
-                  }
-                  className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
-                />
-              </div>
+          {/* Video Controls */}
+          <div className="p-2 bg-gray-800 flex items-center justify-between">
+            {/* Play Controls */}
+            <button
+              className="p-3 bg-gray-200 rounded-full hover:bg-gray-300"
+              onClick={togglePlayPause}
+            >
+              {isPlaying ? (
+                <Pause className="w-6 h-6" />
+              ) : (
+                <Play className="w-6 h-6" />
+              )}
+            </button>
+            {/* Timeline */}
+            <input
+              type="range"
+              min="0"
+              max={videoDuration || 0}
+              step="0.1"
+              value={currentTime}
+              onChange={(e) => handleTimelineUpdate(parseFloat(e.target.value))}
+              className="flex-1 mx-4"
+            />
+            {/* Video Volume */}
+            <div className="flex items-center">
+              <Volume className="w-5 h-5 text-gray-600" />
+              <input
+                type="range"
+                min="0"
+                max="1"
+                step="0.1"
+                value={videoVolume}
+                onChange={(e) => setVideoVolume(parseFloat(e.target.value))}
+                className="w-24 ml-2"
+              />
             </div>
           </div>
         </div>
+      </div>
 
-        <div className="col-span-10 row-span-2 p-4 bg-white shadow-md">
-          <TimelineVisualizer2
-            videoDescriptions={videoDescriptions}
-            currentTime={currentTime} // Convert to milliseconds
-            onDescriptionChange={onDescriptionChange}
-            onTimeUpdate={(ms) => handleTimelineUpdate(ms)} // Convert to seconds
-            visualizer={<div></div>}
-            isPlaying={isPlaying}
-            videoduration={videoDuration}
-            audioVolume={audioVolume}
-          />
-        </div>
+      {/* Timeline Visualizer */}
+      <div className="p-1 bg-white border-t shadow-md">
+        <TimelineVisualizer2
+          videoDescriptions={videoDescriptions}
+          currentTime={currentTime} // Convert to milliseconds
+          onDescriptionChange={onDescriptionChange}
+          onTimeUpdate={(ms) => handleTimelineUpdate(ms)} // Convert to seconds
+          visualizer={<div></div>}
+          isPlaying={isPlaying}
+          videoduration={videoDuration}
+          audioVolume={audioVolume}
+        />
       </div>
     </div>
-  );
-};
-
-// const convertTimestampToSeconds = (timestamp: string): number => {
-//   const parts = timestamp.split(":");
-//   const seconds = parseFloat(parts.pop() || "0");
-//   const minutes = parseInt(parts.pop() || "0", 10);
-//   const hours = parseInt(parts.pop() || "0", 10);
-//   return hours * 3600 + minutes * 60 + seconds;
-// };
-
-const convertTimestampToSeconds = (timestamp: string): number => {
-  // Check if the timestamp is in the format hhmmSSss (e.g., 000279 for 00:02.79)
-  if (/^\d{6}(\.\d+)?$/.test(timestamp)) {
-    const hours = parseInt(timestamp.slice(0, 2), 10);
-    const minutes = parseInt(timestamp.slice(2, 4), 10);
-    const seconds = parseFloat(timestamp.slice(4)); // Handles fractional seconds
-
-    if (minutes < 0 || minutes >= 60) {
-      throw new Error(
-        `Invalid minutes value: ${minutes}. Must be between 0 and 59.`
-      );
-    }
-    if (seconds < 0 || seconds >= 60) {
-      throw new Error(
-        `Invalid seconds value: ${seconds}. Must be between 0 and 59.999.`
-      );
-    }
-
-    return hours * 3600 + minutes * 60 + seconds;
-  }
-
-  // Check if the timestamp is in the format HH:MM:SS.sss
-  if (/^(\d{1,2}):(\d{1,2}):(\d{1,2}(?:\.\d+)?)$/.test(timestamp)) {
-    const parts = timestamp.split(":");
-    const hours = parseInt(parts[0], 10);
-    const minutes = parseInt(parts[1], 10);
-    const seconds = parseFloat(parts[2]); // Handles fractional seconds
-
-    if (minutes < 0 || minutes >= 60) {
-      throw new Error(
-        `Invalid minutes value: ${minutes}. Must be between 0 and 59.`
-      );
-    }
-    if (seconds < 0 || seconds >= 60) {
-      throw new Error(
-        `Invalid seconds value: ${seconds}. Must be between 0 and 59.999.`
-      );
-    }
-
-    return hours * 3600 + minutes * 60 + seconds;
-  }
-
-  // If neither format matches, throw an error
-  throw new Error(
-    `Invalid timestamp format: ${timestamp}. Expected formats: HH:MM:SS.sss or hhmmSSss`
   );
 };
 
