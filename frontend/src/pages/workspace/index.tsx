@@ -59,8 +59,8 @@ export function WorkSpace() {
 
   const handleProcessVideo = async (videoFile: File, action: string) => {
     if (!action) {
-      alert("Please select an action");
-      return;
+        alert("Please select an action");
+        return;
     }
 
     const formData = new FormData();
@@ -68,37 +68,39 @@ export function WorkSpace() {
     formData.append("video", videoFile);
 
     try {
-      const response = await fetch("http://localhost:5000/process-video", {
-        method: "POST",
-        body: formData,
-      });
+        const response = await fetch("http://localhost:5000/process-video", {
+            method: "POST",
+            body: formData,
+        });
 
-      if (response.ok) {
-        const result: {
-          descriptions: string[];
-          message: string;
-          scene_files: string[];
-          timestamps: [string, string][];
-        } = await response.json();
+        if (response.ok) {
+            const result: {
+                descriptions: string[];
+                message: string;
+                scene_files: string[];
+                timestamps: [string, string][];
+                request_id: string; 
+            } = await response.json();
 
-        const processedDescriptions = result.timestamps.map(
-          (timestamp: any, index: number) => ({
-            startTime: timestamp[0],
-            endTime: timestamp[1],
-            description: result.descriptions[index],
-            videoUrl: `http://localhost:5000/scene_files/${result.scene_files[index]}`,
-          })
-        );
+            const processedDescriptions = result.timestamps.map(
+                (timestamp: any, index: number) => ({
+                    startTime: timestamp[0],
+                    endTime: timestamp[1],
+                    description: result.descriptions[index],
+                    // 修改 URL 构造方式
+                    videoUrl: `http://localhost:5000/scene_files/${result.request_id}/${result.scene_files[index]}`,
+                })
+            );
 
-        setUploadedVideo(videoFile);
-        setVideoDescriptions(processedDescriptions);
-      } else {
-        alert("Error processing video");
-      }
+            setUploadedVideo(videoFile);
+            setVideoDescriptions(processedDescriptions);
+        } else {
+            alert("Error processing video");
+        }
     } catch (error) {
-      alert("Error connecting to backend");
+        alert("Error connecting to backend");
     }
-  };
+};
 
   const handleEncodeVideo = async () => {
     if (!uploadedVideo || videoDescriptions.length === 0) {
