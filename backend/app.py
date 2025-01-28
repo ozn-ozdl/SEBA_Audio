@@ -27,6 +27,7 @@ import tempfile
 import traceback
 
 
+from uuid import uuid4
 
 app = Flask(__name__)
 app.config['MAX_CONTENT_LENGTH'] = 30 * 1024 * 1024
@@ -258,7 +259,6 @@ def process_video():
     if "video" not in request.files:
         return jsonify({"error": "No video file provided"}), 400
 
-    setup()
     video_file = request.files["video"]
     action = request.form.get("action")
 

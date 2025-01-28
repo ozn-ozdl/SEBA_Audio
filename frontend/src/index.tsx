@@ -5,13 +5,15 @@ import "./index.css";
 import { Dashboard } from "./pages/dashboard/index";
 import LandingPage from "./pages/landingPage";
 import { WorkSpace } from "./pages/workspace/index";
+import { SideBar } from "./components/SideBar";
 import reportWebVitals from "./reportWebVitals";
 
 import Workspace2 from "./pages/workspace/index2";
 import Workspace3 from "./pages/workspace/index3";
 import App from "./App";
+import Tutorial from './pages/tutorial/index';
 import FAQ from "./pages/faq/index";
-
+import Team from "./pages/team/index";
 
 const root = ReactDOM.createRoot(
   document.getElementById("root") as HTMLElement
@@ -21,16 +23,25 @@ root.render(
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<LandingPage />} />
-        <Route path="workspace" element={<Workspace3 />} />
-        <Route path="dashboard" element={<Dashboard />} />
-        <Route path="main" element={<App />} />
-        <Route path="faq" element={<FAQ />} />
+        <Route
+          path="*"
+          element={
+            <div className="h-full w-full flex">
+              <SideBar />
+              <div className="grow h-screen overflow-y-auto">
+                <Routes>
+                  <Route path="workspace" element={<Workspace3 />} />
+                  <Route path="dashboard" element={<Dashboard />} />
+                  <Route path="main" element={<App />} />
+                  <Route path="faq" element={<FAQ />} />
+                  <Route path="tutorial" element={<Tutorial />} />
+                  <Route path="team" element={<Team />} />
+                </Routes>
+              </div>
+            </div>
+          }
+        />
       </Routes>
     </BrowserRouter>
   </React.StrictMode>
 );
-
-// If you want to start measuring performance in your app, pass a function
-// to log results (for example: reportWebVitals(console.log))
-// or send to an analytics endpoint. Learn more: https://bit.ly/CRA-vitals
-reportWebVitals();
