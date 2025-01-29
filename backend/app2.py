@@ -1,5 +1,11 @@
+import json
+import mimetypes
 import os
+import re
+import uuid
 from zipfile import ZipFile
+
+from requests import Response
 from common_functions import convert_text_to_speech
 from flask import Flask, request, jsonify, send_from_directory, send_file
 from flask_cors import CORS
@@ -56,19 +62,416 @@ def hello_geek():
 def get_scene_files(filename):
     return send_from_directory(SCENES_FOLDER, filename)
 
+@app.route("/audio/<path:filename>", methods=["GET"])
+def get_audio_files(filename):
+    try:
+        filepath = os.path.join(AUDIO_FOLDER, filename)
+        print(filepath)
+        mimetype, _ = mimetypes.guess_type(filepath)
+        return send_file(
+            filepath,
+            mimetype=mimetype,
+            as_attachment=False,
+            download_name=filename
+        )
+    except Exception as e:
+        return Response(str(e), status=404)
+
+
+# @app.route("/analyze-timestamps", methods=["POST"])
+# def analyze_timestamps():
+#     print("Analyzing timestamps")
+
+#     # Get video name from form data
+#     video_name = request.form.get("video_name")
+#     if not video_name:
+#         return jsonify({"error": "No video name provided"}), 400
+
+#     # Get timestamps from form data
+#     old_timestamps_str = request.form.get("old_timestamps", "")
+#     new_timestamps_str = request.form.get("new_timestamps", "")
+
+#     # Parse timestamps
+#     try:
+#         old_timestamps = [tuple(ts.split('-')) for ts in old_timestamps_str.split(',') if ts]
+#         new_timestamps = [tuple(ts.split('-')) for ts in new_timestamps_str.split(',') if ts]
+#     except Exception as e:
+#         return jsonify({"error": f"Invalid timestamp format: {str(e)}"}), 400
+
+#     # Construct video path from uploads folder
+#     video_path = os.path.join(UPLOAD_FOLDER, video_name)
+#     if not os.path.exists(video_path):
+#         return jsonify({"error": "Video file not found on server"}), 404
+
+#     try:
+#         # Combine and sort timestamps
+#         combined_timestamps = list(set(old_timestamps + new_timestamps))
+#         combined_timestamps.sort(key=lambda x: float(x[0].replace(':', '').replace('.', '')))
+
+#         # Format full response (convert tuples to dicts)
+#         formatted_segments = [{
+#             'start': start,
+#             'end': end,
+#             'type': 'NO_TALKING'
+#         } for start, end in combined_timestamps]
+
+#         # Find changed/new segments (raw tuples)
+#         old_set = set(old_timestamps)
+#         changed_tuples = [ts for ts in new_timestamps if ts not in old_set]
+
+#         # Convert changed tuples to proper segment dictionaries
+#         changed_segments = [{
+#             'start': start,
+#             'end': end,
+#             'type': 'NO_TALKING'
+#         } for start, end in changed_tuples]
+
+#         # Process only changed segments
+#         changed_results = []
+#         if changed_segments:
+#             # Process through your existing pipeline
+#             # processed_segments = ng.process_timestamps(changed_segments)
+#             # scenes_results = ng.process_timestamps(changed_segments)
+#             scene_results = ng.cut_video_by_no_talking(video_path, changed_segments, "scenes_results")
+            
+#             # Generate descriptions
+#             descriptions = ng.describe_existing_segments("scenes_results", scene_results, "audio")
+#             print("DESCRIPTIONS", descriptions)
+#             # Format response
+#             changed_results = ng.format_response_data(changed_segments, descriptions)
+#             print("CHANGED RESULTS", changed_results)
+
+#         return jsonify({
+#             "full_segments": formatted_segments,
+#             "changed_segments": changed_results
+#         }), 200
+
+#     except Exception as e:
+#         print("An error occurred:", traceback.format_exc())
+#         return jsonify({"error": f"An error occurred during processing: {str(e)}"}), 500
+
+# @app.route("/analyze-timestamps", methods=["POST"])
+# def analyze_timestamps():
+#     print("Analyzing timestamps")
+
+#     try:
+#         # Get form data with consistent naming
+#         video_name = request.form.get("video_name")
+#         old_data_str = request.form.get("old_data", "[]")
+#         new_timestamp_str = request.form.get("new_timestamp", "")  # Singular form
+
+#         if not video_name:
+#             return jsonify({"error": "No video name provided"}), 400
+
+#         # Parse old data with descriptions
+#         old_data = json.loads(old_data_str)
+#         old_timestamps = {(item["start"], item["end"]): item["description"] 
+#                         for item in old_data if "start" in item and "end" in item}
+
+#         # Parse new timestamps
+#         new_timestamps = []
+#         if new_timestamp_str:
+#             new_timestamps = [tuple(ts.split('-')) for ts in new_timestamp_str.split(',') if ts]
+
+#         # Construct video path
+#         video_path = os.path.join(UPLOAD_FOLDER, video_name)
+#         if not os.path.exists(video_path):
+#             return jsonify({"error": "Video file not found on server"}), 404
+
+#         # Combine all segments
+#         all_segments = list({(s, e) for s, e in [*old_timestamps.keys(), *new_timestamps]})
+        
+#         # Sort segments by start time
+#         def time_to_seconds(t):
+#             return sum(float(x) * 60**i for i, x in enumerate(reversed(t.split(":"))))
+        
+#         all_segments.sort(key=lambda x: time_to_seconds(x[0]))
+
+#         # Process changed segments
+#          # Process changed segments
+#         processed_data = []
+#         changed_segments = [ts for ts in new_timestamps if ts not in old_timestamps]
+
+#         if changed_segments:
+#             # Add type field to changed segments
+#             changed_segments_dict = [{
+#                 'start': s, 
+#                 'end': e,
+#                 'type': 'NO_TALKING'  # Add this line
+#             } for s, e in changed_segments]
+            
+#             # Cut video and generate descriptions
+#             scenes = ng.cut_video_by_no_talking(
+#                 video_path, changed_segments_dict, SCENES_FOLDER
+#             )
+#             descriptions = ng.describe_existing_segments(SCENES_FOLDER, scenes, AUDIO_FOLDER)
+#             print("Scenes:", scenes)
+#             print("Descriptions:", descriptions)
+#             # # Store processed data
+#             # processed_data = [{
+#             #     'start': seg['start'],
+#             #     'end': seg['end'],
+#             #     'description': desc,
+#             #     'audio_file': f"audio/{scenes[i].scene_ids}.mp3"
+#             # } for i, (seg, desc) in enumerate(zip(changed_segments_dict, descriptions))]
+#             response = ng.format_response_data(changed_segments_dict, descriptions)
+
+#         print("Response:", response)
+#         # Merge with old descriptions
+#         final_descriptions = []
+#         for start, end in all_segments:
+#             # Check for new processed data first
+#             new_entry = next((p for p in processed_data 
+#                             if p['start'] == start and p['end'] == end), None)
+            
+#             if new_entry:
+#                 final_descriptions.append(new_entry)
+#             else:
+#                 # Fall back to old description
+#                 final_descriptions.append({
+#                     'start': start,
+#                     'end': end,
+#                     'description': old_timestamps.get((start, end), "NO_TALKING"),
+#                     'audio_file': f"audio/{uuid.uuid4()}.mp3" if (start, end) in old_timestamps else None
+#                 })
+
+#         return jsonify({
+#             'descriptions': final_descriptions,
+#             'waveform_image': "./waveforms/waveform.png"
+#         }), 200
+
+#     except json.JSONDecodeError as e:
+#         return jsonify({"error": f"Invalid old_data format: {str(e)}"}), 400
+#     except Exception as e:
+#         print("An error occurred:", traceback.format_exc())
+#         return jsonify({"error": f"An error occurred during processing: {str(e)}"}), 500
+
+
+# @app.route("/analyze-timestamps", methods=["POST"])
+# def analyze_timestamps():
+#     print("Analyzing timestamps (milliseconds)")
+
+#     try:
+#         # Get input data
+#         video_name = request.form.get("video_name")
+#         old_data_str = request.form.get("old_data", "[]")
+#         new_timestamp_str = request.form.get("new_timestamp", "")
+
+#         if not video_name:
+#             return jsonify({"error": "No video name provided"}), 400
+
+#         # Parse timestamps as integers (milliseconds)
+#         old_data = json.loads(old_data_str)
+#         old_segments = {
+#             ((seg["start"]), (seg["end"])): seg.get("description", "")
+#             for seg in old_data if "start" in seg and "end" in seg
+#         }
+
+#         print (new_timestamp_str)
+#         new_segments = []
+#         if new_timestamp_str:
+#             new_segments = [
+#                 tuple(map(int, ts.split("-"))) 
+#                 for ts in new_timestamp_str.split(",") 
+#                 if ts
+#             ]
+
+#         # Validate video exists
+#         video_path = os.path.join(UPLOAD_FOLDER, video_name)
+#         if not os.path.exists(video_path):
+#             return jsonify({"error": "Video file not found"}), 404
+
+#         # Combine and sort all segments
+#         all_segments = list({*old_segments.keys(), *new_segments})
+#         all_segments.sort(key=lambda x: x[0])  # Sort by start ms
+
+#         # Process changed segments
+#         changed_segments = [ts for ts in new_segments if ts not in old_segments]
+#         processed_data = []
+
+#         if changed_segments:
+#             # Convert ms to seconds for video processing
+#             segments_for_processing = [{
+#                 "start": start/1000.0,
+#                 "end": end/1000.0,
+#                 "type": "NO_TALKING"
+#             } for (start, end) in changed_segments]
+
+#             # Process video segments
+#             scene_data = ng.cut_video_by_no_talking(
+#                 video_path, 
+#                 segments_for_processing, 
+#                 SCENES_FOLDER
+#             )
+            
+#             # Generate descriptions
+#             descriptions = ng.describe_existing_segments(
+#                 SCENES_FOLDER, 
+#                 scene_data, 
+#                 AUDIO_FOLDER
+#             )
+            
+#             # Format response with ms timestamps
+#             processed_data = [{
+#                 "start": start,
+#                 "end": end,
+#                 "description": desc,
+#                 "audio_file": f"audio/{uuid.uuid4()}.mp3"
+#             } for (start, end), desc in zip(changed_segments, descriptions)]
+
+#         # Merge results
+#         final_output = []
+#         for start, end in all_segments:
+#             # Find matching processed segment
+#             new_entry = next(
+#                 (p for p in processed_data if p["start"] == start and p["end"] == end),
+#                 None
+#             )
+            
+#             if new_entry:
+#                 final_output.append(new_entry)
+#             else:
+#                 final_output.append({
+#                     "start": start,
+#                     "end": end,
+#                     "description": old_segments.get((start, end), "NO_TALKING"),
+#                     "audio_file": None
+#                 })
+
+#         return jsonify({
+#             "descriptions": final_output,
+#             "waveform_image": "/waveforms/waveform.png"
+#         }), 200
+
+#     except json.JSONDecodeError as e:
+#         return jsonify({"error": f"Invalid data format: {str(e)}"}), 400
+#     except Exception as e:
+#         print(f"Processing error: {traceback.format_exc()}")
+#         return jsonify({"error": f"Processing failed: {str(e)}"}), 500
+
+
 @app.route("/analyze-timestamps", methods=["POST"])
 def analyze_timestamps():
-    print("Analyzing timestamps")
+    print("Analyzing timestamps (milliseconds)")
+    try:
+        # Get input data
+        video_name = request.form.get("video_name")
+        old_data_str = request.form.get("old_data", "[]")
+        new_timestamp_str = request.form.get("new_timestamp", "")
 
-    if "video" not in request.files:
-        return jsonify({"error": "No video file provided"}), 400
+        if not video_name:
+            return jsonify({"error": "No video name provided"}), 400
 
-    if "timestamps" not in request.form:
-        return jsonify({"error": "No timestamps provided"}), 400
+        # Parse `old_data`
+        try:
+            old_data = json.loads(old_data_str)
+            old_segments = {}
+            for seg in old_data:
+                try:
+                    start = int(seg["start"])
+                    end = int(seg["end"])
+                    description = seg.get("description", "")
+                    old_segments[(start, end)] = description
+                except (ValueError, KeyError):
+                    return jsonify({"error": "Invalid start or end value in old_data"}), 400
+        except json.JSONDecodeError:
+            return jsonify({"error": "Invalid JSON format for old_data"}), 400
 
-    video_file = request.files["video"]
-    timestamps = request.form.get("timestamps")
-    
+        # Parse `new_timestamp`
+        try:
+            new_segments = [
+                tuple(map(int, ts.split("-")))
+                for ts in new_timestamp_str.split(",")
+                if "-" in ts  # Ensure the format is `start-end`
+            ]
+        except ValueError:
+            return jsonify({"error": "Invalid format for new_timestamp"}), 400
+
+        # Validate video file exists
+        video_path = os.path.join(UPLOAD_FOLDER, video_name)
+        if not os.path.exists(video_path):
+            return jsonify({"error": "Video file not found"}), 404
+
+        # Combine and sort all segments
+        all_segments = list({*old_segments.keys(), *new_segments})
+        all_segments.sort(key=lambda x: x[0])  # Sort by start time
+
+        # Process changed segments
+        changed_segments = [ts for ts in new_segments if ts not in old_segments]
+        processed_data = []
+
+        if changed_segments:
+            # Convert milliseconds to seconds for processing
+            segments_for_processing = [
+                {"start": start / 1000.0, "end": end / 1000.0, "type": "NO_TALKING"}
+                for (start, end) in changed_segments
+            ]
+
+            # Process video segments
+            scene_data = ng.cut_video_by_no_talking(
+                video_path, segments_for_processing, SCENES_FOLDER
+            )
+
+            # Generate descriptions
+            descriptions = ng.describe_existing_segments(
+                SCENES_FOLDER, scene_data, AUDIO_FOLDER
+            )
+
+            # Format processed data
+            processed_data = [
+                {
+                    "start": start,
+                    "end": end,
+                    "description": desc,
+                    "audio_file": f"audio/{uuid.uuid4()}.mp3",
+                }
+                for (start, end), desc in zip(changed_segments, descriptions)
+            ]
+
+        # Merge results
+        final_output = []
+        for start, end in all_segments:
+            new_entry = next(
+                (p for p in processed_data if p["start"] == start and p["end"] == end),
+                None,
+            )
+
+            if new_entry:
+                final_output.append(new_entry)
+            else:
+                final_output.append(
+                    {
+                        "start": start,
+                        "end": end,
+                        "description": old_segments.get((start, end), "NO_TALKING"),
+                        "audio_file": None,
+                    }
+                )
+
+        # Return response
+        return jsonify(
+            {
+                "descriptions": final_output,
+                "waveform_image": "/waveforms/waveform.png",
+            }
+        ), 200
+
+    except Exception as e:
+        print(f"Processing error: {traceback.format_exc()}")
+        return jsonify({"error": f"Processing failed: {str(e)}"}), 500
+
+  
+def ms_to_srt(ms: int) -> str:
+    """Convert milliseconds to SRT time format (HH:MM:SS,mmm)"""
+    hours, ms = divmod(ms, 3600000)
+    minutes, ms = divmod(ms, 60000)
+    seconds, ms = divmod(ms, 1000)
+    return f"{hours:02d}:{minutes:02d}:{seconds:02d},{ms:03d}"
+
+def ms_to_seconds(ms: int) -> float:
+    """Convert milliseconds to seconds with decimal precision"""
+    return ms / 1000.0
+  
 @app.route("/process-video", methods=["POST"])
 def process_video():
     print("Working")
@@ -91,131 +494,24 @@ def process_video():
     print("action:", action)
 
     try:
-        if action == "openAI_image":
-            vtf.extract_frames_from_video(video_path, FRAMES_FOLDER, 2)
-            scene_changes = dsc.detect_scene_changes(FRAMES_FOLDER, 0.3, 0.4)
-            scene_descriptions, scene_frames = sftd.describe_scenes_with_openai(
-                scene_changes, FRAMES_FOLDER)
-            timestamps, scene_descriptions_final = grv.get_timestamps_and_descriptions(
-                scene_frames, 60, 2, scene_descriptions)
-            scene_files = grv.extract_scenes(
-                video_path, timestamps, SCENES_FOLDER)
-
-            return jsonify({
-                "message": "Scene changes detected successfully",
-                "descriptions": scene_descriptions_final,
-                "timestamps": timestamps,
-                "scene_files": scene_files,
-            }), 200
-        elif action == "gemini_whole_video":
-            description = describe_with_gemini_whole_video(video_path)
-            video_duration = get_video_duration(video_path)
-            start_time = '00:00:00'
-            end_time = video_duration
-            scene_files = grv.extract_scenes(
-                video_path, [(start_time, end_time)], SCENES_FOLDER)
-            return jsonify({
-                "message": "Scene changes detected successfully",
-                "scene_files": scene_files,
-                "descriptions": [description],
-                "timestamps": [(start_time, end_time)],
-            }), 200
-
-        # main pipeline process (gemini_optimized)
-        elif action == "gemini_optimized":
-            print("action: gemini_optimized")
-            detected_scenes = sg.detect_scenes(video_path)
-
-            talking_timestamps = sg.get_talking_timestamps_with_gemini(
-                video_path).strip().splitlines()
-            if (talking_timestamps[0] != "NO_TALKING"):
-                scenes_timestamps = sg.scene_list_to_string_list(
-                    detected_scenes)
-                talking_timestamps = sg.format_talking_timestamps(
-                    talking_timestamps)
-                detected_scenes = sg.combine_speaking_and_scenes(
-                    scenes_timestamps, talking_timestamps)
-
-            scene_descriptions, timestamps, scene_files = sg.describe_scenes_with_gemini_video(
-                video_path, detected_scenes, SCENES_FOLDER)
-            return jsonify({
-                "message": "Scene changes detected successfully",
-                "descriptions": scene_descriptions,
-                "timestamps": timestamps,
-                "scene_files": scene_files,
-                "waveform_image": "backend\waveforms\waveform.png"
-            }), 200
-
-        elif action == "mock":
-            print("action: gemini_optimized")
-
-            # Mocking scene detection and talking timestamps functionality
-            detected_scenes = [
-                {"start": "00:00:00", "end": "00:00:04"},
-                {"start": "00:00:04", "end": "00:00:16"},
-                {"start": "00:00:16", "end": "00:00:20"},
-                {"start": "00:00:20", "end": "00:00:27"},
-                {"start": "00:00:27", "end": "00:00:30"}
-            ]
-
-            talking_timestamps = ["NO_TALKING"]  # Mock response
-
-            if talking_timestamps[0] != "NO_TALKING":
-                scenes_timestamps = [
-                    f"{scene['start']} - {scene['end']}" for scene in detected_scenes
-                ]
-
-                talking_timestamps = [
-                    "00:00:10 - 00:00:12",
-                    "00:00:18 - 00:00:19"
-                ]  # Mock formatted timestamps
-
-                detected_scenes = [
-                    {
-                        "start": scene.split(' - ')[0],
-                        "end": scene.split(' - ')[1]
-                    } for scene in scenes_timestamps
-                ]
-
-            # Mocking Gemini's scene description and other outputs
-            response_data = {
-                "message": "Scene changes detected successfully",
-                "descriptions": [
-                    "A blue \"Big Buck Bunny\" logo with a white butterfly flies across.\n",
-                    "A pink-hued sky overlooks a tranquil green meadow and forest.\n",
-                    "A serene stream flows through a vibrant, lush meadow.\n",
-                    "A fluffy cartoon bird wakes up, yawns, and flies away.\n",
-                    "A whimsical forest scene shows a cozy burrow beneath a tree.\n"
-                ],
-                "timestamps": [
-                    ["00:00:00", "00:00:04"],
-                    ["00:00:04", "00:00:16"],
-                    ["00:00:16", "00:00:20"],
-                    ["00:00:20", "00:00:27"],
-                    ["00:00:27", "00:00:30"]
-                ],
-                "scene_files": [
-                    "scene_1.mp4",
-                    "scene_2.mp4",
-                    "scene_3.mp4",
-                    "scene_4.mp4",
-                    "scene_5.mp4"
-                ],
-                "waveform_image": "./waveforms/waveform.png"
-            }
-
-            return jsonify(response_data), 200
-        
-        elif action == "new_gemini":
+        if action == "new_gemini":
             print("action: new_gemini")
-            
-            talking_timestamps = sg.get_talking_timestamps_with_gemini(
-                video_path).strip().splitlines()
+
+            # Get the video scenes and combine them with timestamps
             timestamps = ng.get_video_scenes_with_gemini(video_path)
+            print("Timestamps:", timestamps)
             combined_segments = ng.process_timestamps(timestamps)
-            ng.cut_video_by_no_talking(video_path, combined_segments, "scenes_results")
-            output = ng.describe_existing_segments("scenes_results")
+            print("Combined Segments:", combined_segments)
+            # Cut the video by the "NO_TALKING" segments and save them in a folder
+            sceneOutput = ng.cut_video_by_no_talking(video_path, combined_segments, "scenes_results")
+            print("Scene Output:", sceneOutput)
+            # Describe existing segments
+            output = ng.describe_existing_segments("scenes_results", sceneOutput, "audio")
+            print("Output:", output)
+            # Format the response data
             response_data = ng.format_response_data(combined_segments, output)
+
+            print(response_data)
             return jsonify(response_data), 200
 
         else:
@@ -226,163 +522,441 @@ def process_video():
         print("An error occurred:")
         print(traceback.format_exc())
         return jsonify({"error": str(e)}), 500
+    
+# @app.route("/encode-video-with-subtitles", methods=["POST"])
+# def encode_video_with_subtitles():
+#     UPLOAD_FOLDER = "uploads"
+#     PROCESSED_FOLDER = "processed"
+#     temp_files = []
+
+#     try:
+#         data = request.get_json()
+#         if not data:
+#             return jsonify({"error": "No JSON data received"}), 400
+
+#         # Validate required fields
+#         required_fields = ['descriptions', 'timestamps', 'audioFiles', 'videoFileName']
+#         for field in required_fields:
+#             if field not in data or not data[field]:
+#                 return jsonify({"error": f"Missing required field: {field}"}), 400
+
+#         descriptions = data['descriptions']
+#         timestamps = data['timestamps']
+#         audio_files = data['audioFiles']
+#         video_file_name = data['videoFileName']
+
+#         # Validate array lengths
+#         if len(descriptions) != len(timestamps):
+#             return jsonify({"error": "Descriptions and timestamps arrays must be the same length"}), 400
+
+#         # Filter non-TALKING segments with audio files
+#         filtered_segments = []
+#         audio_index = 0
+#         for i, desc in enumerate(descriptions):
+#             if desc.strip().upper() != "TALKING":
+#                 try:
+#                     start, end = timestamps[i]
+#                     audio_file = audio_files[audio_index]
+#                     audio_index += 1
+                    
+#                     filtered_segments.append({
+#                         "start_ts": start,
+#                         "end_ts": end,
+#                         "audio": audio_file,
+#                         "description": desc
+#                     })
+#                 except IndexError:
+#                     return jsonify({"error": "Mismatch between audio files and non-TALKING descriptions"}), 400
+
+#         # Generate SRT file
+#         srt_content = []
+#         for i, seg in enumerate(filtered_segments, 1):
+#             start = seg["start_ts"].replace(".", ",")
+#             end = seg["end_ts"].replace(".", ",")
+#             srt_content.append(
+#                 f"{i}\n{start} --> {end}\n{seg['description'].strip()}\n"
+#             )
+        
+#         srt_path = create_temp_file("\n".join(srt_content), ".srt")
+#         temp_files.append(srt_path)
+
+#         # Get video path
+#         video_path = os.path.join(UPLOAD_FOLDER, video_file_name)
+#         if not os.path.exists(video_path):
+#             return jsonify({"error": "Video file not found"}), 404
+
+#         # Create temporary output audio file
+#         mixed_audio_path = os.path.join(tempfile.gettempdir(), "mixed_audio.mp3")
+#         temp_files.append(mixed_audio_path)
+
+#         # Prepare audio parameters
+#         audio_clips = [seg["audio"] for seg in filtered_segments]
+#         start_times = [timestamp_to_seconds(seg["start_ts"]) for seg in filtered_segments]
+
+#         # Combine audio files with delays (original function)
+#         combine_audio_with_delays(
+#             audio_files=audio_clips,
+#             seconds_list=start_times,
+#             output_file=mixed_audio_path
+#         )
+
+#         # Encode final video with subtitles
+#         output_filename = f"processed_{video_file_name}"
+#         output_path = os.path.join(PROCESSED_FOLDER, output_filename)
+        
+#         subprocess.run([
+#             "ffmpeg", "-y",
+#             "-i", video_path,
+#             "-i", mixed_audio_path,
+#             "-vf", f"subtitles={srt_path}:force_style='FontName=Arial,FontSize=24'",
+#             "-c:v", "libx264", "-preset", "fast", "-crf", "23",
+#             "-c:a", "aac", "-b:a", "192k",
+#             "-map", "0:v", "-map", "1:a",
+#             output_path
+#         ], check=True)
+
+#         return send_file(
+#             output_path,
+#             as_attachment=True,
+#             download_name=output_filename,
+#             mimetype='video/mp4'
+#         )
+
+#     except subprocess.CalledProcessError as e:
+#         return jsonify({
+#             "error": "Video processing failed",
+#             "details": e.stderr.decode() if e.stderr else str(e)
+#         }), 500
+#     except Exception as e:
+#         return jsonify({"error": str(e)}), 500
+#     finally:
+#         cleanup_temp_files(temp_files)
+
+# # Original function unchanged
+# def combine_audio_with_delays(audio_files, seconds_list, output_file):
+#     """
+#     Combines a list of audio files into a single audio track with specified delays.
+#     """
+#     if len(audio_files) != len(seconds_list):
+#         raise ValueError("The number of audio files must match the number of delay values.")
+
+#     # Create a complex filter for ffmpeg
+#     filter_complex = ""
+#     inputs = []
+#     for i, (audio_file, delay) in enumerate(zip(audio_files, seconds_list)):
+#         inputs.extend(["-i", audio_file])
+#         filter_complex += f"[{i}:a]adelay={int(delay * 1000)}|{int(delay * 1000)}[a{i}];"
+
+#     # Concatenate all delayed audio streams
+#     filter_complex += "".join([f"[a{i}]" for i in range(len(audio_files))]) + f"amix=inputs={len(audio_files)}:duration=longest[aout]"
+
+#     # Build the ffmpeg command
+#     ffmpeg_command = [
+#         "ffmpeg",
+#         *inputs,
+#         "-filter_complex", filter_complex,
+#         "-map", "[aout]",
+#         output_file
+#     ]
+
+#     # Execute the ffmpeg command
+#     subprocess.run(ffmpeg_command, check=True)
+
+# # Helper functions
+# # def timestamp_to_seconds(ts):
+# #     """Convert HH:MM:SS.ms timestamp to total seconds"""
+# #     parts = re.split(r"[:.]", ts.replace(",", "."))
+# #     if len(parts) < 3:
+# #         raise ValueError(f"Invalid timestamp format: {ts}")
+    
+# #     hours = float(parts[0]) if len(parts) > 3 else 0
+# #     minutes = float(parts[-3])
+# #     seconds = float(parts[-2])
+# #     milliseconds = float(parts[-1])/1000
+    
+# #     return hours*3600 + minutes*60 + seconds + milliseconds
+
+# def create_temp_file(content, suffix):
+#     """Create a temporary file with content"""
+#     with tempfile.NamedTemporaryFile(mode="w", suffix=suffix, delete=False) as f:
+#         f.write(content)
+#         return f.name
+
+# def cleanup_temp_files(paths):
+#     """Clean up temporary files"""
+#     for path in paths:
+#         try:
+#             if path and os.path.exists(path):
+#                 os.remove(path)
+#         except Exception:
+#             pass
 
 @app.route("/encode-video-with-subtitles", methods=["POST"])
 def encode_video_with_subtitles():
-    data = request.get_json()
-    if not data:
-        return jsonify({"error": "Invalid JSON data"}), 400
-
-    descriptions = data.get("descriptions")
-    timestamps = data.get("timestamps")
-    video_file_name = data.get("videoFileName")
-
-    if not all([descriptions, timestamps, video_file_name]):
-        return jsonify({"error": "Missing required fields"}), 400
-
-    video_path = os.path.join(UPLOAD_FOLDER, video_file_name)
-    if not os.path.exists(video_path):
-        return jsonify({"error": "Video file not found"}), 404
+    UPLOAD_FOLDER = "uploads"
+    PROCESSED_FOLDER = "processed"
+    temp_files = []
 
     try:
-        # Generate the SRT content from descriptions and timestamps
-        srt_content = generate_srt_file(descriptions, timestamps)
-        temp_srt_path = os.path.join(tempfile.gettempdir(), "subtitles.srt")
-        with open(temp_srt_path, "w") as srt_file:
-            srt_file.write(srt_content)
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "No JSON data received"}), 400
 
-        # Generate the list of pre-existing audio files corresponding to descriptions
-        audio_files = []
-        for i, description in enumerate(descriptions):
-            if description == "TALKING":
-                continue  # Skip the scene if description is "TALKING"
-            
-            scene_id = i + 1  # Assuming scene ID is just the index (adjust if needed)
-            audio_file_path = os.path.join(AUDIO_FOLDER, f"audio_description_{scene_id}.mp3")
-            
-            if not os.path.exists(audio_file_path):
-                raise FileNotFoundError(f"Audio file for scene_id {scene_id} not found at {audio_file_path}")
-            
-            audio_files.append(audio_file_path)
+        # Validate required fields
+        required_fields = ['descriptions', 'timestamps', 'audioFiles', 'videoFileName']
+        for field in required_fields:
+            if field not in data or not data[field]:
+                return jsonify({"error": f"Missing required field: {field}"}), 400
 
-        if not audio_files:
-            return jsonify({"error": "No valid audio files found to encode with subtitles"}), 400
+        descriptions = data['descriptions']
+        timestamps = data['timestamps']
+        audio_files = data['audioFiles']
+        video_file_name = data['videoFileName']
 
-        # Concatenate the audio files into one audio track
-        temp_audio_path = os.path.join(tempfile.gettempdir(), "combined_audio.mp3")
-        with open(temp_audio_path, 'wb') as combined_audio:
-            for audio_file in audio_files:
-                with open(audio_file, 'rb') as file:
-                    combined_audio.write(file.read())
+        # Validate array lengths
+        if len(descriptions) != len(timestamps):
+            return jsonify({"error": "Descriptions and timestamps arrays must be the same length"}), 400
 
-        # Encode the video with the subtitles and the new audio track
-        output_path = os.path.join(PROCESSED_FOLDER, f"processed_{video_file_name}")
+        # Filter non-TALKING segments with audio files
+        filtered_segments = []
+        audio_index = 0
+        for i, desc in enumerate(descriptions):
+            if desc.strip().upper() != "TALKING":
+                try:
+                    start, end = timestamps[i]
+                    audio_file = audio_files[audio_index]
+                    audio_index += 1
+                    
+                    filtered_segments.append({
+                        "start_ts": start,
+                        "end_ts": end,
+                        "audio": audio_file,
+                        "description": desc
+                    })
+                except IndexError:
+                    return jsonify({"error": "Mismatch between audio files and non-TALKING descriptions"}), 400
+
+        # Process audio clips to fit in timestamps
+        for seg in filtered_segments:
+            try:
+                start = int(seg["start_ts"])
+                end = int(seg["end_ts"])
+                desired_duration_ms = end - start
+                
+                if desired_duration_ms <= 0:
+                    raise ValueError("End timestamp must be after start timestamp")
+                
+                original_audio = seg["audio"]
+                original_duration_ms = get_audio_duration(original_audio) * 1000
+                
+                if original_duration_ms > desired_duration_ms:
+                    speed_factor = original_duration_ms / desired_duration_ms
+                    # Create temporary sped-up audio file
+                    with tempfile.NamedTemporaryFile(suffix=".mp3", delete=False) as temp_file:
+                        temp_path = temp_file.name
+                    temp_files.append(temp_path)
+                    speed_up_audio(original_audio, speed_factor, temp_path)
+                    seg["audio"] = temp_path
+
+            except Exception as e:
+                cleanup_temp_files(temp_files)
+                return jsonify({"error": f"Audio processing failed: {str(e)}"}), 500
+
+        # Generate SRT file
+        srt_content = []
+        for i, seg in enumerate(filtered_segments, 1):
+            start_srt = milliseconds_to_srt_time(seg["start_ts"])
+            end_srt = milliseconds_to_srt_time(seg["end_ts"])
+            srt_content.append(
+                f"{i}\n{start_srt} --> {end_srt}\n{seg['description'].strip()}\n"
+            )
         
-        ffmpeg_command = [
-            "ffmpeg",
-            "-y",
+        srt_path = create_temp_file("\n".join(srt_content), ".srt")
+        temp_files.append(srt_path)
+
+        # Get video path
+        video_path = os.path.join(UPLOAD_FOLDER, video_file_name)
+        if not os.path.exists(video_path):
+            return jsonify({"error": "Video file not found"}), 404
+
+        # Create temporary output audio file
+        mixed_audio_path = os.path.join(tempfile.gettempdir(), "mixed_audio.mp3")
+        temp_files.append(mixed_audio_path)
+
+        # Prepare audio parameters
+        audio_clips = [seg["audio"] for seg in filtered_segments]
+        start_times = [timestamp_to_seconds(seg["start_ts"]) for seg in filtered_segments]
+
+        # Combine audio files with delays
+        combine_audio_with_delays(
+            audio_files=audio_clips,
+            seconds_list=start_times,
+            output_file=mixed_audio_path
+        )
+
+        # Encode final video with subtitles
+        output_filename = f"processed_{video_file_name}"
+        output_path = os.path.join(PROCESSED_FOLDER, output_filename)
+        
+        subprocess.run([
+            "ffmpeg", "-y",
             "-i", video_path,
-            "-i", temp_audio_path,  # Input the new audio
-            "-vf", f"subtitles={temp_srt_path}",
-            "-c:v", "libx264",
-            "-c:a", "aac",  # Encoding the audio
-            "-preset", "fast",
-            "-crf", "23",
-            "-strict", "experimental",  # Required for AAC audio codec
+            "-i", mixed_audio_path,
+            "-vf", f"subtitles={srt_path}:force_style='FontName=Arial,FontSize=24'",
+            "-c:v", "libx264", "-preset", "fast", "-crf", "23",
+            "-c:a", "aac", "-b:a", "192k",
+            "-map", "0:v", "-map", "1:a",
             output_path
-        ]
-        subprocess.run(ffmpeg_command, check=True)
+        ], check=True)
 
-        # Return the processed video file
-        return send_file(output_path, as_attachment=True, attachment_filename=os.path.basename(output_path), mimetype='video/mp4')
+        return send_file(
+            output_path,
+            as_attachment=True,
+            download_name=output_filename,
+            mimetype='video/mp4'
+        )
 
+    except subprocess.CalledProcessError as e:
+        return jsonify({
+            "error": "Video processing failed",
+            "details": e.stderr.decode() if e.stderr else str(e)
+        }), 500
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+    finally:
+        cleanup_temp_files(temp_files)
 
-def generate_srt_file(descriptions, timestamps):
-    """
-    Generate the SRT subtitle file content from descriptions and timestamps.
-
-    Args:
-        descriptions (list): A list of description texts.
-        timestamps (list): A list of timestamps [start_time, end_time].
-
-    Returns:
-        str: The content of the SRT file.
-    """
-    srt_content = ""
-    for i, (timestamp, description) in enumerate(zip(timestamps, descriptions)):
-        start_time = timestamp[0]
-        end_time = timestamp[1]
-
-        # Format the times to match SRT format (hh:mm:ss,ms)
-        start_time_str = format_time(start_time)
-        end_time_str = format_time(end_time)
-
-        # Add the subtitle entry
-        srt_content += f"{i + 1}\n{start_time_str} --> {end_time_str}\n{description}\n\n"
-
-    return srt_content
-
-def format_time(seconds):
-    """
-    Convert a time in seconds to the SRT time format (hh:mm:ss,ms).
-
-    Args:
-        seconds (float): Time in seconds.
-
-    Returns:
-        str: Time in SRT format (hh:mm:ss,ms).
-    """
-    hours = int(seconds // 3600)
-    minutes = int((seconds % 3600) // 60)
-    seconds = seconds % 60
-    milliseconds = int((seconds % 1) * 1000)
-
-    return f"{hours:02}:{minutes:02}:{int(seconds):02},{milliseconds:03}"
-
-@app.route("/processed/<path:filename>", methods=["GET"])
-def get_processed_video(filename):
-    try:
-        return send_from_directory(PROCESSED_FOLDER, filename, as_attachment=True)
-    except FileNotFoundError:
-        return jsonify({"error": "File not found"}), 404
-
-@app.route("reprocess-descriptions", methods=["POST"])
-def reprocess_descriptions():
-    data = request.get_json()
-    if not data or ("timestamps" and "descriptions") not in data:
-        return jsonify({"error": "Invalid input. 'descriptions' is required."}), 400
+def speed_up_audio(input_path, speed_factor, output_path):
+    """Speed up audio using ffmpeg's atempo filter with chaining for factors > 2.0"""
+    if speed_factor < 1.0:
+        raise ValueError("Speed factor must be >= 1.0")
     
+    atempo_filters = []
+    while speed_factor > 2.0:
+        atempo_filters.append("atempo=2.0")
+        speed_factor /= 2.0
+    if speed_factor != 1.0:
+        atempo_filters.append(f"atempo={speed_factor}")
+    
+    if not atempo_filters:
+        # No speed change needed, copy the file
+        subprocess.run(["ffmpeg", "-y", "-i", input_path, "-c", "copy", output_path], check=True)
+        return
+
+    filter_str = ",".join(atempo_filters)
+    subprocess.run([
+        "ffmpeg", "-y",
+        "-i", input_path,
+        "-filter:a", filter_str,
+        "-c:a", "libmp3lame",
+        "-q:a", "2",
+        output_path
+    ], check=True)
+
+def get_audio_duration(file_path):
+    """Get audio duration in seconds using ffprobe"""
+    cmd = [
+        "ffprobe",
+        "-v", "error",
+        "-show_entries", "format=duration",
+        "-of", "default=noprint_wrappers=1:nokey=1",
+        file_path
+    ]
+    result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    if result.returncode != 0:
+        raise RuntimeError(f"Failed to get audio duration: {result.stderr}")
+    return float(result.stdout.strip())
+
+def milliseconds_to_srt_time(ms):
+    """Convert milliseconds to SRT timestamp format (HH:MM:SS,mmm)"""
+    ms = int(ms)
+    hours = ms // 3600000
+    ms %= 3600000
+    minutes = ms // 60000
+    ms %= 60000
+    seconds = ms // 1000
+    milliseconds = ms % 1000
+    return f"{hours:02d}:{minutes:02d}:{seconds:02d},{milliseconds:03d}"
+
+def timestamp_to_seconds(ms):
+    """Convert milliseconds timestamp to total seconds"""
+    return ms / 1000.0
+
+# Helper functions remain unchanged
+def create_temp_file(content, suffix):
+    with tempfile.NamedTemporaryFile(mode="w", suffix=suffix, delete=False) as f:
+        f.write(content)
+        return f.name
+
+def cleanup_temp_files(paths):
+    for path in paths:
+        try:
+            if path and os.path.exists(path):
+                os.remove(path)
+        except Exception:
+            pass
+
+def combine_audio_with_delays(audio_files, seconds_list, output_file):
+    if len(audio_files) != len(seconds_list):
+        raise ValueError("The number of audio files must match the number of delay values.")
+
+    filter_complex = ""
+    inputs = []
+    for i, (audio_file, delay) in enumerate(zip(audio_files, seconds_list)):
+        inputs.extend(["-i", audio_file])
+        filter_complex += f"[{i}:a]adelay={int(delay * 1000)}|{int(delay * 1000)}[a{i}];"
+
+    filter_complex += "".join([f"[a{i}]" for i in range(len(audio_files))]) + f"amix=inputs={len(audio_files)}:duration=longest[aout]"
+
+    subprocess.run([
+        "ffmpeg",
+        *inputs,
+        "-filter_complex", filter_complex,
+        "-map", "[aout]",
+        output_file
+    ], check=True)
+
+
 @app.route("/text-to-speech", methods=["POST"])
 def text_to_speech():
-    data = request.form.get("descriptions")
+    # Get the JSON data directly from the request
+    data = request.get_json()
 
-    if not data:
-        return jsonify({"error": "Descriptions are required."}), 400
-
+    if not data or not isinstance(data, list):
+        return jsonify({"error": "Descriptions must be provided as a list."}), 400
+    print("Data:", data)
     try:
-        descriptions = json.loads(data)  # Parse the descriptions
-
         audio_files = []
-        for description, timestamps, scene_id in descriptions:
-            # Use your function to convert text to speech for each description
-            audio_file_path = convert_text_to_speech(description, AUDIO_FOLDER, f"audio_description_{scene_id}")
-            
-            # Append the audio file and scene ID to the audio_files list
-            audio_files.append({"id": scene_id, "audio_file": audio_file_path})
+        for item in data:
+            print("Item:", item)
+            description = item.get("description")
+            timestamps = item.get("timestamps")
+            scene_id = item.get("scene_id")
+            unique_id = str(uuid.uuid4())
+            print("Description:", description)
+            print("Timestamps:", timestamps)
+            print("Scene ID:", scene_id)
+            # if not description or not timestamps or not scene_id:
+            #     return jsonify({"error": "Each item must have description, timestamps, and scene_id."}), 400
 
-        # If only one audio file, send it directly
-        if len(audio_files) == 1:
-            return send_file(audio_files[0]["audio_file"], mimetype="audio/mpeg", as_attachment=True)
+            start_time, end_time = timestamps  # Unpack the timestamps
 
-        # Create a ZIP file containing all the audio files and return it
-        zip_filename = os.path.join(AUDIO_FOLDER, "audio_files.zip")
-        with ZipFile(zip_filename, 'w') as zipf:
-            for audio in audio_files:
-                zipf.write(audio["audio_file"], os.path.basename(audio["audio_file"]))
+            # Use the provided function to convert text to speech for each description
+            audio_file_path = convert_text_to_speech(description, AUDIO_FOLDER, f"audio_description_{unique_id}")
 
-        return send_file(zip_filename, mimetype="application/zip", as_attachment=True, attachment_filename="audio_files.zip")
+            # Append the description, timestamps, and audio file path to the audio_files list
+            # from the audio file path, strip the leading and trailing whitespaces and the leading dot and slash
+            audio_file_path = audio_file_path.strip()
+            audio_file_path = audio_file_path[2:]
+            print(audio_file_path)
+            audio_files.append({
+                "timestamps": timestamps,
+                "description": description,
+                "audio_file": audio_file_path
+            })
+
+        # Return the generated audio files information in the response
+        return jsonify({"audio_files": audio_files}), 200
 
     except Exception as e:
         return jsonify({"error": f"Failed to process descriptions: {str(e)}"}), 500

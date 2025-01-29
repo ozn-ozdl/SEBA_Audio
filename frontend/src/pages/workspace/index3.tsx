@@ -61,7 +61,9 @@ const Workspace3: React.FC = () => {
   const [previousDescriptions, setPreviousDescriptions] = useState<
     VideoDescriptionItem[]
   >([]);
-
+  const [processingProgress, setProcessingProgress] = useState(0);
+  const [processingMessage, setProcessingMessage] = useState("");
+  const [isProcessing, setIsProcessing] = useState(false);
   const action = "new_gemini";
 
   const reloadPreviousDescriptions = () => {
@@ -99,9 +101,9 @@ const Workspace3: React.FC = () => {
   //       console.log(result);
   //       const videoDescriptionItems: VideoDescriptionItem[] =
   //         result.timestamps.map(
-  //           ([startTime, endTime]: [string, string], index: number) => ({
-  //             startTime: timestampToMilliseconds(startTime),
-  //             endTime: timestampToMilliseconds(endTime),
+  //           ([startTime, endTime]: [number, number], index: number) => ({
+  //             startTime: startTime,
+  //             endTime: endTime,
   //             description:
   //               result.descriptions[index] || "No description available",
   //             audioFile: result.audio_files[index] || undefined,
@@ -124,32 +126,74 @@ const Workspace3: React.FC = () => {
     formData.append("video", videoFile);
 
     try {
+      setIsProcessing(true);
       const response = await fetch("http://localhost:5000/process-video", {
         method: "POST",
         body: formData,
       });
 
-      if (response.ok) {
-        const result = await response.json();
-        console.log(result);
-        const videoDescriptionItems: VideoDescriptionItem[] =
-          result.timestamps.map(
-            ([startTime, endTime]: [number, number], index: number) => ({
-              startTime: startTime,
-              endTime: endTime,
-              description:
-                result.descriptions[index] || "No description available",
-              audioFile: result.audio_files[index] || undefined,
-            })
-          );
-        setPreviousDescriptions(videoDescriptionItems);
-        setVideoDescriptions(videoDescriptionItems);
-        console.log("Video Description Items:", videoDescriptionItems);
-      } else {
-        alert("Error processing video");
+      if (!response.ok || !response.body) {
+        throw new Error("Failed to start processing");
       }
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let videoDescriptionItems: VideoDescriptionItem[] = [];
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        // Process each chunk of data
+        const chunks = decoder.decode(value).split("\n");
+        for (const chunk of chunks) {
+          if (!chunk) continue;
+
+          try {
+            const data = JSON.parse(chunk);
+
+            // Handle progress updates
+            if (data.progress !== undefined) {
+              setProcessingProgress(data.progress);
+              setProcessingMessage(data.message || "");
+
+              if (data.progress === 100 && data.data) {
+                // Final processing complete
+                videoDescriptionItems = data.data.timestamps.map(
+                  ([startTime, endTime]: [number, number], index: number) => ({
+                    startTime: startTime,
+                    endTime: endTime,
+                    description:
+                      data.data.descriptions[index] || "No description",
+                    audioFile: data.data.audio_files[index] || undefined,
+                  })
+                );
+              }
+            }
+
+            // Handle errors
+            if (data.error) {
+              throw new Error(data.error);
+            }
+          } catch (e) {
+            console.error("Error parsing JSON chunk:", e);
+          }
+        }
+      }
+
+      // Update state with final results
+      setPreviousDescriptions(videoDescriptionItems);
+      setVideoDescriptions(videoDescriptionItems);
+      console.log("Video Description Items:", videoDescriptionItems);
     } catch (error) {
-      alert("Error connecting to backend");
+      console.error("Processing error:", error);
+      alert(
+        `Error: ${error instanceof Error ? error.message : "Unknown error"}`
+      );
+    } finally {
+      setIsProcessing(false);
+      setProcessingProgress(0);
+      setProcessingMessage("");
     }
   };
 
@@ -161,16 +205,19 @@ const Workspace3: React.FC = () => {
     console.log("Descriptions:", videoDescriptions);
 
     // Prepare timestamps with normalization
+    // const formatTimestamp = (item: VideoDescriptionItem) =>
+    //   `${normalizeTimestamp(item.startTime)}-${normalizeTimestamp(
+    //     item.endTime
+    //   )}`;
+
     const formatTimestamp = (item: VideoDescriptionItem) =>
-      `${normalizeTimestamp(item.startTime)}-${normalizeTimestamp(
-        item.endTime
-      )}`;
+      `${item.startTime}-${item.endTime}`;
 
     const oldData = previousDescriptions
       .filter((item) => !item.description.toUpperCase().includes("TALKING"))
       .map((item) => ({
-        start: normalizeTimestamp(item.startTime),
-        end: normalizeTimestamp(item.endTime),
+        start: item.startTime,
+        end: item.endTime,
         description: item.description,
       }));
 
@@ -476,6 +523,9 @@ const Workspace3: React.FC = () => {
           handleAnalyzeVideo={handleProcessVideo}
           handleReanalyzeVideo={handleReanalyzeVideo}
           handleRegenerateAudio={handleRegenerateAudio}
+          isProcessing={isProcessing}
+          processingProgress={processingProgress}
+          processingMessage={processingMessage}
         />
         {/* Add a reload button */}
         <div className="fixed bottom-4 right-4">
