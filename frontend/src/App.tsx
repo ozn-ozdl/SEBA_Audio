@@ -188,6 +188,7 @@ const App: React.FC = () => {
             videoDescriptions={videoDescriptions}
             onDescriptionChange={handleDescriptionChange}
             setVideoDescriptions={setVideoDescriptions}
+            name="Project"
           />
         </div>
 

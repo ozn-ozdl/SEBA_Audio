@@ -3,8 +3,6 @@ import VideoUploader from "../../components/VideoUploader";
 import VideoDescription from "../../components/VideoDescription";
 import {
   Video,
-  Play,
-  Pause,
   FileOutput,
   FileAudio2,
   Save,
@@ -14,7 +12,6 @@ import {
 import { useLocalStorage } from "@uidotdev/usehooks";
 
 export function WorkSpace() {
-  const synth = window.speechSynthesis;
   const name = new URLSearchParams(window.location.search).get("name")!;
 
   interface VideoDescriptionItem {
@@ -29,9 +26,6 @@ export function WorkSpace() {
   >([]);
   const [uploadedVideo, setUploadedVideo] = useState<File | null>(null);
   const [combinedDescriptions, setCombinedDescriptions] = useState("");
-  const [speechActive, setSpeechActive] = useState(false);
-  const [speechUtterance, setSpeechUtterance] =
-    useState<SpeechSynthesisUtterance | null>(null);
   const [videoDescriptionsStorage, setVideoDescriptionsStorage] =
     useLocalStorage<
       { name: string; data: VideoDescriptionItem[]; date: String }[]
@@ -146,27 +140,10 @@ export function WorkSpace() {
     }
   };
 
-  const toggleAudioDescription = () => {
-    if (!speechActive) {
-      const speech = new SpeechSynthesisUtterance(combinedDescriptions);
-      speech.lang = "en-US";
-
-      synth.speak(speech);
-      setSpeechActive(true);
-      setSpeechUtterance(speech);
-    } else {
-      synth.cancel();
-      setSpeechActive(false);
-    }
-  };
-
   const resetAppState = () => {
-    synth.cancel();
     setVideoDescriptions([]);
     setUploadedVideo(null);
     setCombinedDescriptions("");
-    setSpeechActive(false);
-    setSpeechUtterance(null);
   };
 
   const handleExportSRT = async () => {
@@ -230,22 +207,31 @@ export function WorkSpace() {
 
   const handleExportMP3 = async () => {
     try {
-      const response = await fetch("http://localhost:5001/text_to_speech", {
+      if (!combinedDescriptions) {
+        alert("No descriptions available to export.");
+        return;
+      }
+      const sceneName = `${name}_combined_audio`;;
+      
+  
+      const response = await fetch("http://localhost:5000/text-to-speech", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ text: combinedDescriptions }),
+        body: JSON.stringify({
+          text: combinedDescriptions,
+          scene_name: sceneName,
+        }),
       });
-
+  
       if (response.ok) {
         const blob = await response.blob();
         const url = URL.createObjectURL(blob);
-
-        // Create a download link and trigger the download
+  
         const link = document.createElement("a");
         link.href = url;
-        link.download = "output.mp3"; // Customize the file name if needed
+        link.download = `${sceneName}.mp3`;
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
@@ -256,7 +242,7 @@ export function WorkSpace() {
       console.error("Error exporting MP3:", error);
       alert("An error occurred while exporting MP3.");
     }
-  };
+  };  
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-indigo-900 via-purple-700 to-indigo-600 flex flex-col">
@@ -283,6 +269,7 @@ export function WorkSpace() {
             onDescriptionChange={(updatedDescriptions) => {
               setVideoDescriptions(updatedDescriptions);
             }}
+            name={name}
           />
         </div>
 
@@ -298,23 +285,8 @@ export function WorkSpace() {
                   Finalize and Encode Video
                 </button>
 
-                <button
-                  onClick={toggleAudioDescription}
-                  className="bg-green-400 text-indigo-900 px-6 py-3 rounded-md shadow-md hover:bg-green-500 transition-all flex items-center gap-2"
-                >
-                  {synth.speaking ? (
-                    <>
-                      <Pause size={20} /> Stop Audio
-                    </>
-                  ) : (
-                    <>
-                      <Play size={20} /> Play Audio
-                    </>
-                  )}
-                </button>
-
                 <div className="flex gap-4">
-                  <button
+                <button
                     className="bg-green-400 text-indigo-900 px-6 py-3 rounded-md shadow-md hover:bg-green-500 transition-all flex items-center gap-2"
                     onClick={handleExportMP3}
                   >
