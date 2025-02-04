@@ -39,10 +39,35 @@ interface VideoTimelineProps {
   handleAnalyzeVideo: (videoFile: File, action: string) => Promise<void>;
   handleReanalyzeVideo: (selectedSceneStartTimes: number[]) => Promise<void>;
   handleRegenerateAudio: () => void;
+  selectedScenes: Set<number>;
+  onSelectScene: (sceneStartTime: number) => void;
+  onSelectAll: (select: boolean) => void;
   isProcessing: boolean;
   processingProgress: number;
   processingMessage: string;
+  onGenerateDescriptions: () => void;
+  onRegenerateAudio: () => void;
 }
+
+const buttonStyles = {
+  base: "transition-all duration-150 font-medium rounded-lg text-sm px-4 py-2 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:pointer-events-none",
+  variants: {
+    default:
+      "bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm hover:shadow-indigo-500/30",
+    secondary:
+      "bg-gray-800 hover:bg-gray-700 text-gray-100 shadow-sm hover:shadow-gray-500/20",
+    ghost: "hover:bg-gray-800/50 text-gray-300 hover:text-gray-100",
+    outline:
+      "border border-gray-600 hover:border-gray-500 bg-gray-900/80 text-gray-300 hover:text-gray-100",
+    destructive:
+      "bg-red-600 hover:bg-red-700 text-white shadow-sm hover:shadow-red-500/30",
+  },
+  sizes: {
+    sm: "px-3 py-1.5 text-xs",
+    md: "px-4 py-2 text-sm",
+    lg: "px-6 py-3 text-base",
+  },
+};
 
 export const TranscriptionEditor: React.FC<VideoTimelineProps> = ({
   videoDescriptions,
@@ -52,9 +77,14 @@ export const TranscriptionEditor: React.FC<VideoTimelineProps> = ({
   handleRegenerateAudio,
   handleReanalyzeVideo,
   handleAnalyzeVideo,
+  selectedScenes,
+  onSelectAll,
+  onSelectScene,
   isProcessing,
   processingProgress,
   processingMessage,
+  onGenerateDescriptions,
+  onRegenerateAudio,
 }) => {
   const [state, setState] = useState({
     isPlaying: false,
@@ -76,7 +106,7 @@ export const TranscriptionEditor: React.FC<VideoTimelineProps> = ({
   const animationRef = useRef<number | null>(null);
 
   const updateState = (newState: Partial<typeof state>) => {
-    setState(prev => ({ ...prev, ...newState }));
+    setState((prev) => ({ ...prev, ...newState }));
   };
 
   useEffect(() => {
@@ -88,8 +118,8 @@ export const TranscriptionEditor: React.FC<VideoTimelineProps> = ({
 
   useEffect(() => {
     const scene = videoDescriptions.find(
-      scene => 
-        state.currentTime >= scene.startTime / 1000 && 
+      (scene) =>
+        state.currentTime >= scene.startTime / 1000 &&
         state.currentTime <= scene.endTime / 1000
     );
     updateState({ currentSubtitle: scene?.description || "" });
@@ -129,7 +159,7 @@ export const TranscriptionEditor: React.FC<VideoTimelineProps> = ({
     if (file) {
       updateState({
         videoUrl: URL.createObjectURL(file),
-        videoFile: file
+        videoFile: file,
       });
     }
   };
@@ -149,11 +179,14 @@ export const TranscriptionEditor: React.FC<VideoTimelineProps> = ({
     await handleReanalyzeVideo(scenesToReanalyze);
     updateState({ isModalOpen: false });
   };
+  function onReanalyze(): void {
+    throw new Error("Function not implemented.");
+  }
 
   return (
     <div className="max-w-full overflow-hidden bg-gray-700/70 backdrop-blur-sm h-screen flex flex-col">
       {isProcessing && (
-        <ProcessingOverlay 
+        <ProcessingOverlay
           progress={processingProgress}
           message={processingMessage}
         />
@@ -162,21 +195,29 @@ export const TranscriptionEditor: React.FC<VideoTimelineProps> = ({
       <SceneSelectionModal
         isOpen={state.isModalOpen}
         scenes={videoDescriptions}
-        selectedScenes={state.selectedScenes}
-        onSelectScene={(sceneTime) => {
-          const newSelection = new Set(state.selectedScenes);
-          newSelection.has(sceneTime) ? newSelection.delete(sceneTime) : newSelection.add(sceneTime);
-          updateState({ selectedScenes: newSelection });
-        }}
-        onConfirm={handleModalConfirm}
+        selectedScenes={selectedScenes} // From props
+        onSelectScene={onSelectScene} // From props
+        onSelectAll={onSelectAll} // From props
+        onConfirm={onReanalyze} // From props
+        onGenerateDescriptions={onGenerateDescriptions}
+        onRegenerateAudio={onRegenerateAudio}
         onClose={() => updateState({ isModalOpen: false })}
       />
 
-      <VideoHeader 
+      {/* <VideoHeader
         onEncode={() => state.videoFile && handleEncodeVideo(state.videoFile)}
         onAnalyze={analyzeVideo}
         onReanalyze={() => updateState({ isModalOpen: true })}
         onRegenerateAudio={handleRegenerateAudio}
+      /> */}
+
+      <VideoHeader
+        uploadedVideo={state.videoFile}
+        onEncode={() => state.videoFile && handleEncodeVideo(state.videoFile)}
+        onAnalyze={analyzeVideo}
+        onReanalyze={() => updateState({ isModalOpen: true })}
+        onRegenerateAudio={handleRegenerateAudio}
+        videoDescriptions={videoDescriptions}
       />
 
       <div className="flex flex-1 overflow-hidden">
@@ -186,7 +227,9 @@ export const TranscriptionEditor: React.FC<VideoTimelineProps> = ({
             selectedScene={state.selectedScene}
             onDescriptionChange={onDescriptionChange}
             onClose={() => updateState({ isDescriptionsVisible: false })}
-            onSceneSelect={(startTime) => updateState({ selectedScene: startTime })}
+            onSceneSelect={(startTime) =>
+              updateState({ selectedScene: startTime })
+            }
           />
         )}
 

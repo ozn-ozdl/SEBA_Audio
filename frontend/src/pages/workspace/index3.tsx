@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Video, Play, Pause, Save, RefreshCw } from "lucide-react";
 import TranscriptionEditor3 from "src/components/Editor3";
+import { Button } from "src/components/ui/button";
 
 interface VideoDescriptionItem {
   startTime: number;
@@ -9,6 +10,24 @@ interface VideoDescriptionItem {
   audioFile?: string;
   isEdited: boolean; // New flag
 }
+
+
+const buttonStyles = {
+  base: "transition-all duration-150 font-medium rounded-lg text-sm px-4 py-2 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:pointer-events-none",
+  variants: {
+    default: "bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm hover:shadow-indigo-500/30",
+    secondary: "bg-gray-800 hover:bg-gray-700 text-gray-100 shadow-sm hover:shadow-gray-500/20",
+    ghost: "hover:bg-gray-800/50 text-gray-300 hover:text-gray-100",
+    outline: "border border-gray-600 hover:border-gray-500 bg-gray-900/80 text-gray-300 hover:text-gray-100",
+    destructive: "bg-red-600 hover:bg-red-700 text-white shadow-sm hover:shadow-red-500/30",
+  },
+  sizes: {
+    sm: "px-3 py-1.5 text-xs",
+    md: "px-4 py-2 text-sm",
+    lg: "px-6 py-3 text-base",
+  },
+};
+
 
 const timestampToMilliseconds = (timestamp: string): number => {
   const [hours, minutes, secondsWithMs] = timestamp.split(":");
@@ -65,7 +84,25 @@ const Workspace3: React.FC = () => {
   const [processingProgress, setProcessingProgress] = useState(0);
   const [processingMessage, setProcessingMessage] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
+  // Add to your Workspace3 component's state
+  const [selectedScenes, setSelectedScenes] = useState<Set<number>>(new Set());
   const action = "new_gemini";
+
+  // Add these inside your Workspace3 component
+  const handleSelectScene = (sceneStartTime: number) => {
+    const newSelection = new Set(selectedScenes);
+    newSelection.has(sceneStartTime) ? newSelection.delete(sceneStartTime) : newSelection.add(sceneStartTime);
+    setSelectedScenes(newSelection);
+  };
+
+  const handleSelectAllScenes = (select: boolean) => {
+    if (select) {
+      const allStartTimes = new Set(videoDescriptions.map(scene => scene.startTime));
+      setSelectedScenes(allStartTimes);
+    } else {
+      setSelectedScenes(new Set());
+    }
+  };
 
   const reloadPreviousDescriptions = () => {
     if (previousDescriptions.length > 0) {
@@ -286,6 +323,7 @@ const Workspace3: React.FC = () => {
     const filteredDescriptions = videoDescriptions.filter((scene) =>
       selectedSceneStartTimes.includes(scene.startTime)
     );
+
 
     const newTimestamps = filteredDescriptions
       .filter((item) => !item.description.toUpperCase().includes("TALKING"))
@@ -589,6 +627,10 @@ const Workspace3: React.FC = () => {
     </svg>
   );
 
+  function handleGenerateDescriptions(): void {
+    throw new Error("Function not implemented.");
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-indigo-900/100 via-purple-700/100 to-indigo-600/100 flex flex-col">
       <main className="flex-grow h-screen overflow-hidden">
@@ -606,16 +648,21 @@ const Workspace3: React.FC = () => {
           isProcessing={isProcessing}
           processingProgress={processingProgress}
           processingMessage={processingMessage}
+          selectedScenes={selectedScenes}
+          onSelectScene={handleSelectScene}
+          onSelectAll={handleSelectAllScenes}
+          onGenerateDescriptions={handleGenerateDescriptions}
+          onRegenerateAudio={handleRegenerateAudio}
         />
         {/* Add a reload button */}
         <div className="fixed bottom-4 right-4">
-          <button
+          <Button
+            variant="secondary"
+            className={`${buttonStyles.base} ${buttonStyles.variants.secondary} p-3 rounded-full shadow-lg backdrop-blur-sm`}
             onClick={reloadPreviousDescriptions}
-            className="-3 bg-blue-600/80 text-white rounded-full shadow-lg hover:bg-blue-700/90 transition-all backdrop-blur-sm"
-            title="Reload previous descriptions"
           >
             <RefreshCw className="w-6 h-6" />
-          </button>
+          </Button>
         </div>
       </main>
     </div>

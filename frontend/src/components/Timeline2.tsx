@@ -620,14 +620,14 @@ const TimelineVisualizer: React.FC<TimelineVisualizerProps> = ({
   useEffect(() => {
     if (!timelineRef.current) return;
     console.log("currentTime", currentTime);
-    const redBarPosition = currentTime * 100;
+    const barPosition = currentTime * 100;
     const scrollLeft = timelineRef.current.scrollLeft;
     const visibleStart = scrollLeft;
     const visibleEnd = scrollLeft + containerWidth;
 
-    if (redBarPosition < visibleStart || redBarPosition > visibleEnd - 50) {
+    if (barPosition < visibleStart || barPosition > visibleEnd - 50) {
       timelineRef.current.scrollTo({
-        left: redBarPosition - containerWidth / 2,
+        left: barPosition - containerWidth / 2,
         behavior: "smooth",
       });
     }
@@ -642,7 +642,7 @@ const TimelineVisualizer: React.FC<TimelineVisualizerProps> = ({
     >
       {/* Add Scene Button */}
       <button
-        className="absolute z-20 text-white rounded-full p-3 shadow-lg transition-transform transform hover:scale-105"
+        className="absolute z-30 text-white rounded-full p-3 shadow-lg transition-transform transform hover:scale-105"
         style={{
           left: `${currentTime * 100 - 16}px`,
           top: "-24px",
