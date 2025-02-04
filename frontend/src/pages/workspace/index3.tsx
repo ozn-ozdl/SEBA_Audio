@@ -7,6 +7,7 @@ interface VideoDescriptionItem {
   endTime: number;
   description: string;
   audioFile?: string;
+  isEdited: boolean; // New flag
 }
 
 const timestampToMilliseconds = (timestamp: string): number => {
@@ -166,6 +167,7 @@ const Workspace3: React.FC = () => {
                     description:
                       data.data.descriptions[index] || "No description",
                     audioFile: data.data.audio_files[index] || undefined,
+                    isEdited: true,
                   })
                 );
               }
@@ -197,21 +199,98 @@ const Workspace3: React.FC = () => {
     }
   };
 
-  const handleReanalyzeVideo = async (videoName: string): Promise<void> => {
-    if (!videoName) {
-      alert("No video specified");
+  // const handleReanalyzeVideo = async (videoName: string): Promise<void> => {
+  //   if (!videoName) {
+  //     alert("No video specified");
+  //     return;
+  //   }
+  //   console.log("Descriptions:", videoDescriptions);
+
+  //   // Prepare timestamps with normalization
+  //   // const formatTimestamp = (item: VideoDescriptionItem) =>
+  //   //   `${normalizeTimestamp(item.startTime)}-${normalizeTimestamp(
+  //   //     item.endTime
+  //   //   )}`;
+
+  //   const formatTimestamp = (item: VideoDescriptionItem) =>
+  //     `${item.startTime}-${item.endTime}`;
+
+  //   const oldData = previousDescriptions
+  //     .filter((item) => !item.description.toUpperCase().includes("TALKING"))
+  //     .map((item) => ({
+  //       start: item.startTime,
+  //       end: item.endTime,
+  //       description: item.description,
+  //     }));
+
+  //   const newTimestamps = videoDescriptions
+  //     .filter((item) => !item.description.toUpperCase().includes("TALKING"))
+  //     .map(formatTimestamp)
+  //     .join(",");
+
+  //   try {
+  //     const formData = new FormData();
+  //     formData.append("video_name", videoName);
+  //     formData.append("old_data", JSON.stringify(oldData));
+  //     formData.append("new_timestamp", newTimestamps);
+
+  //     const response = await fetch("http://localhost:5000/analyze-timestamps", {
+  //       method: "POST",
+  //       body: formData,
+  //     });
+
+  //     if (response.ok) {
+  //       const result = await response.json();
+
+  //       const talkingMap = new Map(
+  //         videoDescriptions
+  //           .filter((item) =>
+  //             item.description.toUpperCase().includes("TALKING")
+  //           )
+  //           .map((item) => [`${item.startTime}-${item.endTime}`, item])
+  //       );
+
+  //       const mergedDescriptions = [
+  //         ...result.descriptions,
+  //         ...Array.from(talkingMap.values()),
+  //       ].sort((a, b) => a.startTime - b.startTime);
+
+  //       setVideoDescriptions(mergedDescriptions);
+  //       setPreviousDescriptions(mergedDescriptions);
+  //       alert("Video reanalyzed successfully!");
+  //     } else {
+  //       const error = await response.json();
+  //       alert(`Error: ${error.error || "Unknown error"}`);
+  //     }
+  //   } catch (error) {
+  //     console.error("Reanalysis error:", error);
+  //     alert("Failed to connect to server");
+  //   }
+  // };
+
+  const handleReanalyzeVideo = async (
+    selectedSceneStartTimes: number[]
+  ): Promise<void> => {
+    if (!selectedSceneStartTimes.length) {
+      alert("No scenes selected for reanalysis");
       return;
     }
-    console.log("Descriptions:", videoDescriptions);
+
+    console.log("Selected scenes for reanalysis:", selectedSceneStartTimes);
 
     // Prepare timestamps with normalization
-    // const formatTimestamp = (item: VideoDescriptionItem) =>
-    //   `${normalizeTimestamp(item.startTime)}-${normalizeTimestamp(
-    //     item.endTime
-    //   )}`;
-
     const formatTimestamp = (item: VideoDescriptionItem) =>
       `${item.startTime}-${item.endTime}`;
+
+    // Filter the video descriptions based on selected scenes
+    const filteredDescriptions = videoDescriptions.filter((scene) =>
+      selectedSceneStartTimes.includes(scene.startTime)
+    );
+
+    const newTimestamps = filteredDescriptions
+      .filter((item) => !item.description.toUpperCase().includes("TALKING"))
+      .map(formatTimestamp)
+      .join(",");
 
     const oldData = previousDescriptions
       .filter((item) => !item.description.toUpperCase().includes("TALKING"))
@@ -221,16 +300,11 @@ const Workspace3: React.FC = () => {
         description: item.description,
       }));
 
-    const newTimestamps = videoDescriptions
-      .filter((item) => !item.description.toUpperCase().includes("TALKING"))
-      .map(formatTimestamp)
-      .join(",");
-
     try {
       const formData = new FormData();
-      formData.append("video_name", videoName);
+      formData.append("video_name", uploadedVideo?.name || ""); // Ensure you have the video name
       formData.append("old_data", JSON.stringify(oldData));
-      formData.append("new_timestamp", newTimestamps);
+      formData.append("new_timestamps", newTimestamps);
 
       const response = await fetch("http://localhost:5000/analyze-timestamps", {
         method: "POST",
@@ -249,7 +323,13 @@ const Workspace3: React.FC = () => {
         );
 
         const mergedDescriptions = [
-          ...result.descriptions,
+          ...result.descriptions.map((desc: any) => ({
+            startTime: desc.start,
+            endTime: desc.end,
+            description: desc.description,
+            audioFile: desc.audioFile,
+            isEdited: true // New items from analysis
+          })),
           ...Array.from(talkingMap.values()),
         ].sort((a, b) => a.startTime - b.startTime);
 

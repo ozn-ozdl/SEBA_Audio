@@ -1,7 +1,7 @@
 export interface VideoDescriptionItem {
-    startTime: string;
-    endTime: string;
-    description: string;
-    videoUrl: string;
-  }
-  
+  startTime: number;
+  endTime: number;
+  description: string;
+  audioFile?: string;
+  isEdited: boolean; // New flag
+}
