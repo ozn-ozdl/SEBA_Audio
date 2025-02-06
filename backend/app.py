@@ -795,7 +795,40 @@ def _create_temp_file(srt_content):
 #         print("An error occurred:")
 #         print(traceback.format_exc())
 #         return jsonify({"error": str(e)}), 500
-    
+
+@app.route("/get-video", methods=["GET"])
+def get_video():
+    video_name = request.args.get("videoName")
+    if not video_name:
+        return jsonify({"error": "Video name is required"}), 400
+
+    video_path = os.path.join(UPLOAD_FOLDER, video_name)
+    if not os.path.exists(video_path):
+        return jsonify({"error": "Video not found"}), 404
+
+    try:
+        mimetype, _ = mimetypes.guess_type(video_path)
+        return send_file(
+            video_path,
+            mimetype=mimetype,
+            as_attachment=True,
+            download_name=video_name
+        )
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+        
+@app.route("/check-video", methods=["GET"])
+def check_video():
+    video_name = request.args.get("videoName")
+    if not video_name:
+        return jsonify({"error": "Video name is required"}), 400
+
+    video_path = os.path.join(UPLOAD_FOLDER, video_name)
+    if os.path.exists(video_path):
+        return jsonify({"exists": True}), 200
+    else:
+        return jsonify({"exists": False}), 404
     
 @app.route("/process-video", methods=["POST"])
 def process_video():

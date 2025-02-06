@@ -6,6 +6,7 @@ from datetime import datetime
 import os
 import time
 import google.generativeai as genai
+
 load_dotenv()
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 genai.configure(api_key=GEMINI_API_KEY)
@@ -21,254 +22,268 @@ import concurrent.futures
 import time
 import random
 
+modelName = "gemini-1.5-flash"
+
 # Millisecond conversion functions
 def time_to_milliseconds(time_str):
-    """Convert HH:MM:SS.sss format to milliseconds"""
-    parts = re.split(r'[:.]', time_str)
-    while len(parts) < 4:
-        parts.append('0')
-    h, m, s, ms = map(int, parts[:4])
-    return h * 3600000 + m * 60000 + s * 1000 + ms
+  """Convert HH:MM:SS.sss format to milliseconds"""
+  parts = re.split(r"[:.]", time_str)
+  while len(parts) < 4:
+    parts.append("0")
+  h, m, s, ms = map(int, parts[:4])
+  return h * 3600000 + m * 60000 + s * 1000 + ms
+
 
 def milliseconds_to_time(ms):
-    """Convert milliseconds to HH:MM:SS.sss format"""
-    ms = int(ms)
-    hours, ms = divmod(ms, 3600000)
-    minutes, ms = divmod(ms, 60000)
-    seconds, ms = divmod(ms, 1000)
-    return f"{hours:02d}:{minutes:02d}:{seconds:02d}.{ms:03d}"
+  """Convert milliseconds to HH:MM:SS.sss format"""
+  ms = int(ms)
+  hours, ms = divmod(ms, 3600000)
+  minutes, ms = divmod(ms, 60000)
+  seconds, ms = divmod(ms, 1000)
+  return f"{hours:02d}:{minutes:02d}:{seconds:02d}.{ms:03d}"
+
 
 # New function to get video duration
 def get_video_duration(video_path):
-    """Get video duration in seconds using ffprobe"""
-    cmd = [
-        'ffprobe', '-v', 'error', '-show_entries', 
-        'format=duration', '-of', 'default=noprint_wrappers=1:nokey=1', video_path
-    ]
-    result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    if result.returncode != 0:
-        raise RuntimeError(f"FFprobe error: {result.stderr.decode()}")
-    return float(result.stdout)
+  """Get video duration in seconds using ffprobe"""
+  cmd = [
+      "ffprobe",
+      "-v",
+      "error",
+      "-show_entries",
+      "format=duration",
+      "-of",
+      "default=noprint_wrappers=1:nokey=1",
+      video_path,
+  ]
+  result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+  if result.returncode != 0:
+    raise RuntimeError(f"FFprobe error: {result.stderr.decode()}")
+  return float(result.stdout)
 
-def describe_existing_segments(segments_directory, scene_data, audio_folder, video_summary):
-    scene_numbers, scene_ids = scene_data
-    segment_files = os.listdir(segments_directory)
-    scene_descriptions = []
 
-    def process_segment(segment_file):
-        segment_path = os.path.join(segments_directory, segment_file)
-        parts = segment_file.split('_')
-        scene_id = parts[1].split('.')[0]
-        
-        if scene_id not in scene_ids:
-            return None
-            
-        description = generate_video_description_with_gemini(segment_path, video_summary)
-        description_audio = convert_text_to_speech(description, audio_folder, f"audio_description_{scene_id}")
-        scene_idx = scene_ids.index(scene_id)
-        scene_number = scene_numbers[scene_idx]
-        
-        return (scene_number, scene_id, description, segment_file, description_audio)
+def describe_existing_segments(segments_directory, scene_data, audio_folder,
+                               video_summary):
+  scene_numbers, scene_ids = scene_data
+  segment_files = os.listdir(segments_directory)
+  scene_descriptions = []
 
-    with concurrent.futures.ThreadPoolExecutor() as executor:
-        future_to_segment = {executor.submit(process_segment, segment_file): segment_file 
-                           for segment_file in segment_files}
-        for future in concurrent.futures.as_completed(future_to_segment):
-            result = future.result()
-            if result:
-                scene_descriptions.append(result)
+  def process_segment(segment_file):
+    segment_path = os.path.join(segments_directory, segment_file)
+    parts = segment_file.split("_")
+    scene_id = parts[1].split(".")[0]
 
-    scene_descriptions.sort(key=lambda x: x[0])
-    return scene_descriptions
+    if scene_id not in scene_ids:
+      return None
+
+    description = generate_video_description_with_gemini(segment_path,
+                                                          video_summary)
+    description_audio = convert_text_to_speech(
+        description, audio_folder, f"audio_description_{scene_id}")
+    scene_idx = scene_ids.index(scene_id)
+    scene_number = scene_numbers[scene_idx]
+
+    return (scene_number, scene_id, description, segment_file,
+            description_audio)
+
+  with concurrent.futures.ThreadPoolExecutor() as executor:
+    future_to_segment = {
+        executor.submit(process_segment, segment_file): segment_file
+        for segment_file in segment_files
+    }
+    for future in concurrent.futures.as_completed(future_to_segment):
+      result = future.result()
+      if result:
+        scene_descriptions.append(result)
+
+  scene_descriptions.sort(key=lambda x: x[0])
+  return scene_descriptions
 
 
 def cut_video_by_no_talking(input_video_path, segments, output_folder):
-    if not os.path.exists(output_folder):
-        os.makedirs(output_folder)
+  if not os.path.exists(output_folder):
+    os.makedirs(output_folder)
 
-    scene_ids = []
-    scene_numbers = []
+  scene_ids = []
+  scene_numbers = []
 
-    for i, segment in enumerate(segments):
-        if segment["type"] == "NO_TALKING":
-            start_ms = segment["start"]
-            end_ms = segment["end"]
-            unique_id = str(uuid.uuid4())
-            scene_ids.append(unique_id)
-            scene_numbers.append(i + 1)
+  for i, segment in enumerate(segments):
+    if segment["type"] == "NO_TALKING":
+      start_ms = segment["start"]
+      end_ms = segment["end"]
+      unique_id = str(uuid.uuid4())
+      scene_ids.append(unique_id)
+      scene_numbers.append(i + 1)
 
-            output_file = os.path.join(output_folder, f"scene_{unique_id}.mp4")
-            start_time = milliseconds_to_time(start_ms)
-            end_time = milliseconds_to_time(end_ms)
+      output_file = os.path.join(output_folder, f"scene_{unique_id}.mp4")
+      start_time = milliseconds_to_time(start_ms)
+      end_time = milliseconds_to_time(end_ms)
 
-            ffmpeg_command = (
-                f"ffmpeg -i {input_video_path} -ss {start_time} -to {end_time} "
-                f"-c:v libx264 -c:a aac -strict experimental {output_file} -y"
-            )
-            subprocess.run(ffmpeg_command, shell=True)
+      ffmpeg_command = (
+          f"ffmpeg -i {input_video_path} -ss {start_time} -to {end_time} "
+          f"-c:v libx264 -c:a aac -strict experimental {output_file} -y")
+      subprocess.run(ffmpeg_command, shell=True)
 
-    return (scene_numbers, scene_ids)
+  return (scene_numbers, scene_ids)
 
 
-            
-def generate_video_description_with_gemini(video_file_path, video_summary, max_retries=5, initial_delay=1):
-    for attempt in range(max_retries):
-        try:
-            # Get scene duration
-            duration_seconds = get_video_duration(video_file_path)
-            word_limit = int((duration_seconds * 170) / 60)  # 170 WPM conversion
-            
-            video_file = genai.upload_file(path=video_file_path)
-            while video_file.state.name == "PROCESSING":
-                time.sleep(1)
-                video_file = genai.get_file(video_file.name)
+def generate_video_description_with_gemini(video_file_path, video_summary,
+                                           max_retries=5, initial_delay=1):
+  for attempt in range(max_retries):
+    try:
+      # Get scene duration
+      duration_seconds = get_video_duration(video_file_path)
+      word_limit = int((duration_seconds * 170) / 60)  # 170 WPM conversion
 
-            prompt = f'''
-            **Video Context Summary**: {video_summary}
-
-            Create a fluid audio description for this video scene that sounds natural when spoken. Follow these guidelines:
-            1. Strictly use {word_limit} words maximum (scene duration: {duration_seconds:.1f}s)
-            2. Describe only visible elements without referencing audible sounds
-            3. Use complete sentences with smooth transitions between actions
-            4. Maintain present tense and active voice: "A man reaches" not "A man is reaching"
-            5. Structure narration in chronological sequence as events appear on screen
-            6. Focus hierarchy:
-               - Primary character movements and interactions
-               - Key object motions and placements
-               - Environmental shifts and lighting changes
-               - Visible emotional cues through facial expressions
-            7. Use natural speech patterns and avoid robotic listings
-
-            Provide only the plain text description without any formatting.
-            '''
-            prompt2 = f'''
-            You are an assistant that creates natural, clear, and concise audio descriptions for a given video scene for visually impaired individuals.
-            Describe the visual content of the whole given video scene in exactly one single sentence with no more than {word_limit} words.
-            Focus on key actions, objects, and emotions.
-            Ensure the sentence sounds natural when spoken aloud and provides essential information.
-            Only return the sentence without any additional information or text.
-            '''
-            print("Word limit:", word_limit)
-            model = genai.GenerativeModel(model_name="gemini-1.5-flash")
-            response = model.generate_content([video_file, prompt2],
-                                              request_options={"timeout": 600})
-            return response.text.strip('"')
-        except Exception as e:
-            if attempt == max_retries - 1:
-                raise
-            delay = initial_delay * (2 ** attempt) + random.uniform(0, 1)
-            time.sleep(delay)
-            
-def get_video_summary_with_gemini(video_file_path):
-    """Generate summary of entire video"""
-    video_file = genai.upload_file(path=video_file_path)
-    while video_file.state.name == "PROCESSING":
+      video_file = genai.upload_file(path=video_file_path)
+      while video_file.state.name == "PROCESSING":
         time.sleep(1)
         video_file = genai.get_file(video_file.name)
 
-    prompt = '''
-    Provide a concise 50-word summary of the entire video content focusing on:
-    - Overall context and setting
-    - Key visual elements and scenes
-    - Important non-verbal interactions
-    - Significant object placements
-    - Emotional tone and atmosphere
-    '''
-    
-    model = genai.GenerativeModel(model_name="gemini-1.5-flash")
-    response = model.generate_content([video_file, prompt],
-                                      request_options={"timeout": 600})
-    return response.text
+        prompt = f"""
+            You are an assistant that creates natural, clear, and concise audio descriptions for a given video scene for visually impaired individuals.
+            Given the following **Video Context Summary**: {video_summary}, describe the visual content of the whole given video scene in exactly one single sentence with no more than {word_limit} words.
+            Focus on key actions, objects, and emotions, building upon the context provided in the video summary.
+            Ensure the sentence sounds natural when spoken aloud and provides essential information.
+            Only return the sentence without any additional information or text.
+            """
+      
+        prompt2 = f"""
+            You are an assistant that creates natural, clear, and concise audio descriptions for a given video scene for visually impaired individuals.
+            Describe the visual content of the whole given video scene in exactly one single sentence with aroun {word_limit} words. 
+            Focus on key actions, objects, and emotions, building upon the context provided in the video summary.
+            Ensure the sentence sounds natural when spoken aloud and provides essential information.
+            Only return the sentence without any additional information or text.
+            """
+      
+      print("Word limit:", word_limit)
+      model = genai.GenerativeModel(model_name=modelName)
+      response = model.generate_content([video_file, prompt2],
+                                        request_options={"timeout": 600})
+      return response.text.strip('"')
+    except Exception as e:
+      if attempt == max_retries - 1:
+        raise
+      delay = initial_delay * (2**attempt) + random.uniform(0, 1)
+      time.sleep(delay)
+
+
+def get_video_summary_with_gemini(video_file_path):
+  """Generate summary of entire video"""
+  video_file = genai.upload_file(path=video_file_path)
+  while video_file.state.name == "PROCESSING":
+    time.sleep(1)
+    video_file = genai.get_file(video_file.name)
+
+  prompt = """
+    Provide a concise summary of the entire video content in approximately 50 words. Focus on:
+    - The central theme or narrative
+    - Key visual elements and their significance
+    - The overall emotional tone or atmosphere
+    - Any important context that would help someone understand individual scenes
+    """
+
+  model = genai.GenerativeModel(model_name=modelName)
+  response = model.generate_content([video_file, prompt],
+                                    request_options={"timeout": 600})
+  return response.text
+
 
 def format_response_data(combined_segments, descriptions):
-    descriptions_sorted = sorted(descriptions, key=lambda x: x[0])
-    response_data = {
-        "message": "Scene changes detected successfully",
-        "descriptions": [],
-        "timestamps": [],
-        "scene_files": [],
-        "audio_files": [],
-        "waveform_image": "./waveforms/waveform.png"
-    }
+  descriptions_sorted = sorted(descriptions, key=lambda x: x[0])
+  response_data = {
+      "message": "Scene changes detected successfully",
+      "descriptions": [],
+      "timestamps": [],
+      "scene_files": [],
+      "audio_files": [],
+  }
 
-    for idx, segment in enumerate(combined_segments):
-        description = "TALKING" if segment["type"] == "TALKING" else ""
-        audio_file = "" if segment["type"] == "TALKING" else None
+  for idx, segment in enumerate(combined_segments):
+    description = "TALKING" if segment["type"] == "TALKING" else ""
+    audio_file = "" if segment["type"] == "TALKING" else None
 
-        if segment["type"] == "NO_TALKING":
-            scene_data = next((desc for desc in descriptions_sorted if desc[0] == idx + 1), None)
-            if scene_data:
-                _, _, scene_description, segment_file, description_audio = scene_data
-                description = scene_description
-                response_data["scene_files"].append(segment_file)
-                audio_file = description_audio
+    if segment["type"] == "NO_TALKING":
+      scene_data = next(
+          (desc for desc in descriptions_sorted if desc[0] == idx + 1), None)
+      if scene_data:
+        _, _, scene_description, segment_file, description_audio = scene_data
+        description = scene_description
+        response_data["scene_files"].append(segment_file)
+        audio_file = description_audio
 
-        response_data["descriptions"].append(description)
-        response_data["audio_files"].append(audio_file)
-        response_data["timestamps"].append([segment["start"], segment["end"]])
+    response_data["descriptions"].append(description)
+    response_data["audio_files"].append(audio_file)
+    response_data["timestamps"].append([segment["start"], segment["end"]])
 
-    return response_data
+  return response_data
+
 
 def process_timestamps(input_string, max_gap=3000):
-    input_string = str(input_string)
-    input_string = input_string[7:-3]
+  input_string = str(input_string)
+  input_string = input_string[7:-3]
 
-    if not input_string:
-        raise ValueError("Invalid input string")
-    
-    try:
-        timestamps = json.loads(input_string)
-    except json.JSONDecodeError as e:
-        raise ValueError(f"JSON decode error: {str(e)}")
+  if not input_string:
+    raise ValueError("Invalid input string")
 
-    combined_segments = []
-    current_talking = None
+  try:
+    timestamps = json.loads(input_string)
+  except json.JSONDecodeError as e:
+    raise ValueError(f"JSON decode error: {str(e)}")
 
-    for segment in timestamps:
-        start_time = time_to_milliseconds(segment["start"])
-        end_time = time_to_milliseconds(segment["end"])
+  combined_segments = []
+  current_talking = None
 
-        if segment["type"] == "TALKING":
-            if current_talking and start_time <= current_talking[1] + max_gap:
-                current_talking = (current_talking[0], max(current_talking[1], end_time))
-            else:
-                if current_talking:
-                    combined_segments.append({
-                        "start": current_talking[0],
-                        "end": current_talking[1],
-                        "type": "TALKING"
-                    })
-                current_talking = (start_time, end_time)
-        else:
-            if current_talking:
-                combined_segments.append({
-                    "start": current_talking[0],
-                    "end": current_talking[1],
-                    "type": "TALKING"
-                })
-                current_talking = None
-            combined_segments.append({
-                "start": start_time,
-                "end": end_time,
-                "type": "NO_TALKING"
-            })
+  for segment in timestamps:
+    start_time = time_to_milliseconds(segment["start"])
+    end_time = time_to_milliseconds(segment["end"])
 
-    if current_talking:
+    if segment["type"] == "TALKING":
+      if (
+          current_talking
+          and start_time <= current_talking[1] + max_gap
+      ):
+        current_talking = (current_talking[0],
+                           max(current_talking[1], end_time))
+      else:
+        if current_talking:
+          combined_segments.append({
+              "start": current_talking[0],
+              "end": current_talking[1],
+              "type": "TALKING"
+          })
+        current_talking = (start_time, end_time)
+    else:
+      if current_talking:
         combined_segments.append({
             "start": current_talking[0],
             "end": current_talking[1],
             "type": "TALKING"
         })
-    
-    return combined_segments
+        current_talking = None
+      combined_segments.append({
+          "start": start_time,
+          "end": end_time,
+          "type": "NO_TALKING"
+      })
+
+  if current_talking:
+    combined_segments.append({
+        "start": current_talking[0],
+        "end": current_talking[1],
+        "type": "TALKING"
+    })
+
+  return combined_segments
+
 
 def get_video_scenes_with_gemini(video_file_path):
-    video_file = genai.upload_file(path=video_file_path)
-    while video_file.state.name == "PROCESSING":
-        time.sleep(1)
-        video_file = genai.get_file(video_file.name)
+  video_file = genai.upload_file(path=video_file_path)
+  while video_file.state.name == "PROCESSING":
+    time.sleep(1)
+    video_file = genai.get_file(video_file.name)
 
-    prompt = '''
+  prompt = """
     Please analyze the video and provide a single, ordered JSON array of objects representing all segments, including both talking and non-talking parts. It is crucial to accurately, up to the millisecond, determine the presence of talking and non-talking moments:
     - For talking parts, ensure that speech is correctly detected, ignore anything that isn't human speech, only label strictly talking segments and return an object with 'type' as 'TALKING'.
     - For non-talking parts, ensure that no speech is happening, make sure the scenes are at least 3 seconds long, allowing for easy interpretation of the video content and return an object with 'type' as 'NO_TALKING'.
@@ -280,9 +295,9 @@ def get_video_scenes_with_gemini(video_file_path):
 
     Ensure that the timestamps are in the exact format HH:MM:SS.SS - HH:MM:SS.SS, with each timestamp having exactly two digits for hours, minutes, seconds, and two digits for milliseconds.
     The list should be ordered chronologically.
-    '''
-    
-    prompt2 = '''
+    """
+
+  prompt2 = """
     Please analyze the video and provide a complete segmentation of the entire timeline into consecutive TALKING and NO_TALKING segments. Follow these rules:
     1. Detect ALL speech segments (TALKING) with exact millisecond precision.
     2. Fill ALL remaining time between TALKING segments with NO_TALKING segments.
@@ -300,9 +315,9 @@ def get_video_scenes_with_gemini(video_file_path):
     - 'type': TALKING or NO_TALKING.
     - Time segments must be consecutive and continuous.
     - Millisecond precision required for all timestamps.
-    '''
+    """
 
-    model = genai.GenerativeModel(model_name="gemini-1.5-flash")
-    response = model.generate_content([video_file, prompt],
-                                      request_options={"timeout": 600})
-    return response.text
+  model = genai.GenerativeModel(model_name=modelName)
+  response = model.generate_content([video_file, prompt],
+                                    request_options={"timeout": 600})
+  return response.text

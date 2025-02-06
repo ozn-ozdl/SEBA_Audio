@@ -57,7 +57,8 @@ const TimelineVisualizer: React.FC<TimelineVisualizerProps> = ({
   const [scrollPosition, setScrollPosition] = useState(0);
   const [containerWidth, setContainerWidth] = useState(0);
   const [audioDurations, setAudioDurations] = useState<AudioDurations>({});
-  const [startX, setStartX] = useState<number | null>(null); // Track touch start position
+  const [startX, setStartX] = useState<number | null>(null); // Track touch start
+  // position
 
   // Define handleWheel function
   const handleWheel = (e: WheelEvent) => {
@@ -125,18 +126,6 @@ const TimelineVisualizer: React.FC<TimelineVisualizerProps> = ({
       .toString()
       .padStart(3, "0")}`;
   };
-
-  // useEffect(() => {
-  //   const updateContainerSize = () => {
-  //     if (timelineRef.current) {
-  //       setContainerWidth(timelineRef.current.offsetWidth);
-  //     }
-  //   };
-
-  //   updateContainerSize();
-  //   window.addEventListener("resize", updateContainerSize);
-  //   return () => window.removeEventListener("resize", updateContainerSize);
-  // }, []);
 
   useEffect(() => {
     const updateContainerSize = () => {
@@ -250,117 +239,10 @@ const TimelineVisualizer: React.FC<TimelineVisualizerProps> = ({
     });
   }, [videoDescriptions, elements]);
 
-  // const addNewScene = () => {
-  //   const currentTimeMs = currentTime * 1000; // Convert currentTime (seconds) to milliseconds
-  //   const minWidthPixels = 50; // Minimum width in pixels (500ms)
-
-  //   const newSceneElement: TimelineElement = {
-  //     id: 0,
-  //     text: "New Scene",
-  //     position: currentTimeMs / 10, // Convert ms to pixels (1px = 10ms)
-  //     width: minWidthPixels,
-  //     startTime: currentTimeMs,
-  //     endTime: currentTimeMs + minWidthPixels * 10, // Convert width to duration in ms
-  //     audioFile: undefined,
-  //   };
-
-  //   setElements((prev) => {
-  //     const updatedElements = [...prev, newSceneElement].sort(
-  //       (a, b) => a.position - b.position
-  //     );
-
-  //     const reassignedElements = updatedElements.map((el, index) => ({
-  //       ...el,
-  //       id: index + 1,
-  //     }));
-
-  //     const updatedDescriptions = reassignedElements.map((el) => ({
-  //       startTime: el.startTime,
-  //       endTime: el.endTime,
-  //       description: el.text,
-  //       audioFile: el.audioFile,
-  //     }));
-
-  //     onDescriptionChange(updatedDescriptions);
-  //     return reassignedElements;
-  //   });
-  // };
-
-  // const addNewScene = () => {
-  //   const currentTimeMs = currentTime * 1000; // Convert to milliseconds
-  //   const currentPosition = currentTimeMs / 10; // Convert to pixels (1px = 10ms)
-
-  //   // Prevent adding if current time overlaps any existing element
-  //   const hasOverlap = elements.some(
-  //     (el) => currentTimeMs >= el.startTime && currentTimeMs < el.endTime
-  //   );
-  //   if (hasOverlap) return;
-
-  //   // Find surrounding elements
-  //   const sortedElements = [...elements].sort(
-  //     (a, b) => a.position - b.position
-  //   );
-
-  //   // Find first element that starts after current position
-  //   const nextElement = sortedElements.find(
-  //     (el) => el.position > currentPosition
-  //   );
-  //   // Find last element that ends before current position
-  //   const previousElements = sortedElements.filter(
-  //     (el) => el.position + el.width <= currentPosition
-  //   );
-  //   const previousElement = previousElements[previousElements.length - 1];
-
-  //   // Calculate available space
-  //   const previousEnd = previousElement
-  //     ? previousElement.position + previousElement.width
-  //     : 0;
-  //   const nextStart = nextElement ? nextElement.position : timelineWidth;
-
-  //   // Ensure valid placement and minimum width
-  //   const availableWidth = nextStart - currentPosition;
-  //   if (availableWidth < 50 || currentPosition < previousEnd) return;
-
-  //   const newSceneElement: TimelineElement = {
-  //     id: 0, // Temporary ID
-  //     text: "New Scene",
-  //     position: currentPosition,
-  //     width: availableWidth, // Fill available space
-  //     startTime: currentTimeMs,
-  //     endTime: currentTimeMs + availableWidth * 10,
-  //     audioFile: undefined,
-  //     isEdited: false, // Default to false
-  //   };
-
-  //   setElements((prev) => {
-  //     const updatedElements = [...prev, newSceneElement].sort(
-  //       (a, b) => a.position - b.position
-  //     );
-
-  //     // Reassign sequential IDs
-  //     const reassignedElements = updatedElements.map((el, index) => ({
-  //       ...el,
-  //       id: index + 1,
-  //     }));
-
-  //     // Update parent component
-  //     onDescriptionChange(
-  //       reassignedElements.map((el) => ({
-  //         startTime: el.startTime,
-  //         endTime: el.endTime,
-  //         description: el.text,
-  //         audioFile: el.audioFile,
-  //         isEdited: false,
-  //       }))
-  //     );
-
-  //     return reassignedElements;
-  //   });
-  // };
-
   const addNewScene = () => {
     const currentTimeMs = currentTime * 1000; // Convert to milliseconds
-    const currentPosition = currentTimeMs / 10; // Convert to pixels (1px = 10ms)
+    const currentPosition = currentTimeMs / 10; // Convert to pixels (1px =
+    // 10ms)
 
     // Prevent adding if current time overlaps any existing element
     const hasOverlap = elements.some(
@@ -430,10 +312,6 @@ const TimelineVisualizer: React.FC<TimelineVisualizerProps> = ({
     });
   };
 
-  // useEffect(() => {
-  //   setTimelineWidth(videoduration * 100);
-  // }, [videoduration]);
-
   useEffect(() => {
     if (videoduration) {
       setTimelineWidth(videoduration * 100);
@@ -453,21 +331,6 @@ const TimelineVisualizer: React.FC<TimelineVisualizerProps> = ({
       window.removeEventListener("resize", handleResize);
     };
   }, [videoduration]);
-
-  // useEffect(() => {
-  //   const newElements = videoDescriptions.map((desc, index) => ({
-  //     id: index + 1,
-  //     text: desc.description,
-  //     position: desc.startTime / 10, // Convert ms to pixels (1px = 10ms)
-  //     width: (desc.endTime - desc.startTime) / 10, // Convert duration in ms to pixels
-  //     startTime: desc.startTime,
-  //     endTime: desc.endTime,
-  //     audioFile: desc.audioFile || undefined,
-  //   }));
-
-  //   setElements(newElements);
-  //   updateContainers(newElements);
-  // }, [videoDescriptions, timelineWidth]);
 
   useEffect(() => {
     const newElements = videoDescriptions.map((desc, index) => ({
@@ -552,256 +415,6 @@ const TimelineVisualizer: React.FC<TimelineVisualizerProps> = ({
 
     onDescriptionChange(updatedDescriptions);
   };
-
-  // const handleResize = (
-  //   elementId: number,
-  //   direction: string,
-  //   ref: HTMLElement,
-  //   delta: { width: number; height: number },
-  //   position: { x: number; y: number }
-  // ) => {
-  //   const container = containers.find((c) => c.id === elementId);
-  //   if (!container) return;
-  //   console.log("delta", delta);
-  //   console.log("position", position);
-  //   // Get actual pixel dimensions from the element
-  //   const currentWidth = parseFloat(ref.style.width);
-  //   const currentLeft = parseFloat(ref.style.left);
-  //   // console.log("currentWidth", currentWidth);
-  //   // console.log("currentLeft", position["x"]);
-
-  //   // console.log("console startposition", container.startPosition);
-  //   // Convert to timeline-absolute coordinates
-  //   const absolutePosition = container.startPosition + position["x"];
-  //   const absoluteRight = absolutePosition + currentWidth;
-
-  //   // console.log("console absolutePosition", absolutePosition);
-
-  //   // Find neighboring elements
-  //   const sortedElements = [...elements].sort(
-  //     (a, b) => a.position - b.position
-  //   );
-  //   const currentIndex = sortedElements.findIndex((e) => e.id === elementId);
-
-  //   // Calculate boundaries
-  //   const prevElement = sortedElements[currentIndex - 1];
-  //   const nextElement = sortedElements[currentIndex + 1];
-
-  //   const minPosition = prevElement
-  //     ? prevElement.position + prevElement.width
-  //     : 0;
-  //   const maxPosition = nextElement ? nextElement.position : timelineWidth;
-
-  //   // Calculate new dimensions
-  //   let newWidth = currentWidth;
-  //   let newPosition = absolutePosition;
-
-  //   if (direction === "right") {
-  //     newWidth = Math.min(
-  //       Math.max(50, absoluteRight - newPosition),
-  //       maxPosition - newPosition
-  //     );
-  //   } else if (direction === "left") {
-  //     newPosition = Math.max(minPosition, absolutePosition);
-  //     newWidth = Math.min(
-  //       Math.max(50, absoluteRight - newPosition),
-  //       maxPosition - newPosition
-  //     );
-  //   }
-
-  //   // Update elements
-  //   const newElements = elements.map((el) =>
-  //     el.id === elementId
-  //       ? {
-  //           ...el,
-  //           position: newPosition,
-  //           width: newWidth,
-  //           startTime: newPosition * 10,
-  //           endTime: (newPosition + newWidth) * 10,
-  //         }
-  //       : el
-  //   );
-
-  //   setElements(newElements);
-  //   updateContainers(newElements); // Update containers in real-time
-  // };
-
-  // const handleResize = (
-  //   elementId: number,
-  //   direction: string,
-  //   ref: HTMLElement,
-  //   delta: { width: number; height: number },
-  //   position: { x: number; y: number }
-  // ) => {
-  //   const container = containers.find((c) => c.id === elementId);
-  //   if (!container) return;
-
-  //   // Get actual pixel dimensions from the element
-  //   const currentWidth = parseFloat(ref.style.width);
-  //   const currentLeft = parseFloat(ref.style.left);
-
-  //   // Convert to timeline-absolute coordinates
-  //   const absolutePosition = container.startPosition + position["x"];
-  //   const absoluteRight = absolutePosition + currentWidth;
-
-  //   // Find neighboring elements
-  //   const sortedElements = [...elements].sort(
-  //     (a, b) => a.position - b.position
-  //   );
-  //   const currentIndex = sortedElements.findIndex((e) => e.id === elementId);
-
-  //   // Calculate boundaries
-  //   const prevElement = sortedElements[currentIndex - 1];
-  //   const nextElement = sortedElements[currentIndex + 1];
-
-  //   const minPosition = prevElement
-  //     ? prevElement.position + prevElement.width
-  //     : 0;
-  //   const maxPosition = nextElement ? nextElement.position : timelineWidth;
-
-  //   // Calculate new dimensions
-  //   let newWidth = currentWidth;
-  //   let newPosition = absolutePosition;
-
-  //   if (direction === "right") {
-  //     newWidth = Math.min(
-  //       Math.max(50, absoluteRight - newPosition),
-  //       maxPosition - newPosition
-  //     );
-  //   } else if (direction === "left") {
-  //     newPosition = Math.max(minPosition, absolutePosition);
-  //     newWidth = Math.min(
-  //       Math.max(50, absoluteRight - newPosition),
-  //       maxPosition - newPosition
-  //     );
-  //   }
-
-  //   // Update elements
-  //   const newElements = elements.map((el) =>
-  //     el.id === elementId
-  //       ? {
-  //           ...el,
-  //           position: newPosition,
-  //           width: newWidth,
-  //           startTime: newPosition * 10,
-  //           endTime: (newPosition + newWidth) * 10,
-  //         }
-  //       : el
-  //   );
-
-  //   setElements(newElements);
-  //   updateContainers(newElements); // Update containers in real-time
-  // };
-
-  // const handleResize = (
-  //   elementId: number,
-  //   direction: string,
-  //   ref: HTMLElement,
-  //   delta: { width: number; height: number },
-  //   position: { x: number; y: number }
-  // ) => {
-  //   resizingRef.current = true; // Set resizing flag
-  //   const container = containers.find((c) => c.id === elementId);
-  //   if (!container) return;
-
-  //   // Get actual pixel dimensions from the element
-  //   const currentWidth = parseFloat(ref.style.width);
-  //   const currentLeft = parseFloat(ref.style.left);
-
-  //   // Convert to timeline-absolute coordinates
-  //   const absolutePosition = container.startPosition + position["x"];
-  //   const absoluteRight = absolutePosition + currentWidth;
-
-  //   // Find neighboring elements
-  //   const sortedElements = [...elements].sort(
-  //     (a, b) => a.position - b.position
-  //   );
-  //   const currentIndex = sortedElements.findIndex((e) => e.id === elementId);
-
-  //   // Calculate boundaries
-  //   const prevElement = sortedElements[currentIndex - 1];
-  //   const nextElement = sortedElements[currentIndex + 1];
-
-  //   const minPosition = prevElement
-  //     ? prevElement.position + prevElement.width
-  //     : 0;
-  //   const maxPosition = nextElement ? nextElement.position : timelineWidth;
-
-  //   // Calculate new dimensions
-  //   let newWidth = currentWidth;
-  //   let newPosition = absolutePosition;
-
-  //   if (direction === "right") {
-  //     newWidth = Math.min(
-  //       Math.max(50, absoluteRight - newPosition),
-  //       maxPosition - newPosition
-  //     );
-  //   } else if (direction === "left") {
-  //     newPosition = Math.max(minPosition, absolutePosition);
-  //     newWidth = Math.min(
-  //       Math.max(50, absoluteRight - newPosition),
-  //       maxPosition - newPosition
-  //     );
-  //   }
-
-  //   // Update elements with continuous time updates
-  //   const newElements = elements.map((el) =>
-  //     el.id === elementId
-  //       ? {
-  //           ...el,
-  //           position: newPosition,
-  //           width: newWidth,
-  //           startTime: newPosition * 10,
-  //           endTime: (newPosition + newWidth) * 10,
-  //         }
-  //       : el
-  //   );
-
-  //   setElements(newElements);
-  //   updateContainers(newElements); // Update containers in real-time
-  // };
-
-  // const handleResizeStop = (
-  //   elementId: number,
-  //   direction: string,
-  //   ref: HTMLElement,
-  //   delta: { width: number; height: number },
-  //   position: { x: number; y: number }
-  // ) => {
-  //   resizingRef.current = false; // Reset resizing flag
-
-  //   const container = containers.find((c) => c.id === elementId);
-  //   if (!container) return;
-
-  //   const currentWidth = parseFloat(ref.style.width);
-  //   const absolutePosition = container.startPosition + position["x"];
-
-  //   const newElements = elements.map((el) =>
-  //     el.id === elementId
-  //       ? {
-  //           ...el,
-  //           position: absolutePosition,
-  //           width: currentWidth,
-  //           startTime: absolutePosition * 10,
-  //           endTime: (absolutePosition + currentWidth) * 10,
-  //         }
-  //       : el
-  //   );
-
-  //   setElements(newElements);
-  //   updateContainers(newElements);
-
-  //   // Update parent component with final changes
-  //   const updatedDescriptions = newElements.map((el) => ({
-  //     startTime: el.startTime,
-  //     endTime: el.endTime,
-  //     description: el.text,
-  //     audioFile: el.audioFile,
-  //     isEdited: true, // Mark as edited
-  //   }));
-
-  //   onDescriptionChange(updatedDescriptions);
-  // };
 
   const handleResize = (
     elementId: number,
@@ -953,9 +566,20 @@ const TimelineVisualizer: React.FC<TimelineVisualizerProps> = ({
       const audio = audioRef.current[element.id];
       if (!audio || !element.audioFile) return;
 
-      const elementStartTime = element.startTime / 1000; // Convert ms to seconds
+      const elementStartTime = element.startTime / 1000; // Convert ms to
+      // seconds
       const elementEndTime = element.endTime / 1000; // Convert ms to seconds
+      const elementDuration = elementEndTime - elementStartTime;
       const audioDuration = audioDurations[element.id] || 0;
+
+      let playbackRate = 1;
+
+      // Adjust playback rate if audio is longer than the scene
+      if (audioDuration > elementDuration) {
+        playbackRate = audioDuration / elementDuration;
+      }
+
+      audio.playbackRate = playbackRate;
 
       if (currentTime >= elementStartTime && currentTime < elementEndTime) {
         const audioOffset = currentTime - elementStartTime;
@@ -1059,7 +683,8 @@ const TimelineVisualizer: React.FC<TimelineVisualizerProps> = ({
               width: width,
               height: "64px", // Maintain consistent height
               top: "50%", // Center vertically
-              transform: "translateY(-50%)", // Adjust for exact vertical centering
+              transform: "translateY(-50%)", // Adjust for exact vertical
+              // centering
             }}
             onClick={(e) => e.stopPropagation()}
           >

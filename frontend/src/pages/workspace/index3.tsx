@@ -1,7 +1,17 @@
-import React, { useState, useEffect } from "react";
-import { Video, Play, Pause, Save, RefreshCw } from "lucide-react";
+import React, { useState, useEffect, useRef } from "react";
+import {
+  Video,
+  Play,
+  Pause,
+  Save,
+  RefreshCw,
+  ChevronUp,
+  ChevronDown,
+} from "lucide-react";
 import TranscriptionEditor3 from "src/components/Editor3";
 import { Button } from "src/components/ui/button";
+import { useLocalStorage } from "@uidotdev/usehooks";
+import { useSearchParams } from "react-router-dom";
 
 interface VideoDescriptionItem {
   startTime: number;
@@ -68,6 +78,18 @@ const normalizeTimestamp = (timestamp: number | string): string => {
   return `${hours}:${minutes}:${seconds}.${milliseconds}`;
 };
 
+interface ProjectData {
+  name: string;
+  data: VideoDescriptionItem[];
+  date: string;
+  videoName: string;
+  screenshot?: string;
+}
+
+interface Workspace3Props {
+  projectName: string;
+}
+
 const Workspace3: React.FC = () => {
   const [videoDescriptions, setVideoDescriptions] = useState<
     VideoDescriptionItem[]
@@ -85,6 +107,61 @@ const Workspace3: React.FC = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [selectedScenes, setSelectedScenes] = useState<Set<number>>(new Set());
   const action = "new_gemini";
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const [hasFetchedVideo, setHasFetchedVideo] = useState(false);
+  const [isSlideInModalOpen, setIsSlideInModalOpen] = useState(true);
+  const [searchParams] = useSearchParams();
+  const projectName = searchParams.get("name") || "defaultProject";
+
+  const [videoDescriptionsStorage, setVideoDescriptionsStorage] =
+    useLocalStorage<ProjectData[]>("video_descriptions", []);
+
+  useEffect(() => {
+    // Load data from local storage if available
+    const storedProject = videoDescriptionsStorage?.find(
+      (item) => item.name === projectName
+    );
+    if (storedProject) {
+      setVideoDescriptions(storedProject.data);
+      setVideoName(storedProject.videoName);
+      if (!uploadedVideo && !hasFetchedVideo) {
+        fetchVideoFile(storedProject.videoName);
+        setHasFetchedVideo(true);
+      }
+    }
+  }, [projectName, videoDescriptionsStorage, uploadedVideo, hasFetchedVideo]);
+
+  const fetchVideoFile = async (videoName: string) => {
+    try {
+      // Check if video file already exists
+      if (uploadedVideo) {
+        console.log("Video file already exists, skipping fetch.");
+        return;
+      }
+      console.log("Video name:", videoName);
+      const response = await fetch(
+        `http://localhost:5000/get-video?videoName=${videoName}`,
+        {
+          method: "GET",
+        }
+      );
+      if (response.ok) {
+        const videoBlob = await response.blob();
+        const videoFile = new File([videoBlob], videoName, {
+          type: "video/mp4",
+        });
+        setUploadedVideo(videoFile);
+        setVideoName(videoName);
+        console.log("Video file:", videoFile);
+      } else {
+        console.error("Failed to fetch video file:", response.status);
+        alert("Failed to fetch video file.");
+      }
+    } catch (error) {
+      console.error("Error fetching video file:", error);
+      alert("Error fetching video file.");
+    }
+  };
 
   // Add these inside your Workspace3 component
   const handleSelectScene = (sceneStartTime: number) => {
@@ -281,122 +358,6 @@ const Workspace3: React.FC = () => {
     }
   };
 
-  // const handleRegenerateAudio = async (): Promise<void> => {
-  //   const updatedDescriptions = [...videoDescriptions];
-  //   const regenerationIndices: number[] = [];
-  //   const regenerationPayload: any[] = [];
-
-  //   updatedDescriptions.forEach((item, index) => {
-  //     if (!item.description.toUpperCase().includes("TALKING")) {
-  //       regenerationIndices.push(index);
-  //       regenerationPayload.push({
-  //         description: item.description,
-  //         timestamps: [Number(item.startTime), Number(item.endTime)],
-  //         scene_id: item.startTime,
-  //       });
-  //     }
-  //   });
-
-  //   if (regenerationPayload.length === 0) {
-  //     console.log("No descriptions need regeneration.");
-  //     return;
-  //   }
-
-  //   try {
-  //     const response = await fetch("http://localhost:5000/text-to-speech", {
-  //       method: "POST",
-  //       headers: {
-  //         "Content-Type": "application/json",
-  //       },
-  //       body: JSON.stringify(regenerationPayload),
-  //     });
-
-  //     if (!response.ok) {
-  //       throw new Error("Failed to regenerate audio");
-  //     }
-
-  //     const data = await response.json();
-
-  //     // Update the original array using stored indices
-  //     data.audio_files.forEach(
-  //       (audioFileData: { audio_file: string }, responseIndex: number) => {
-  //         const originalIndex = regenerationIndices[responseIndex];
-  //         if (
-  //           originalIndex !== undefined &&
-  //           updatedDescriptions[originalIndex]
-  //         ) {
-  //           updatedDescriptions[originalIndex] = {
-  //             ...updatedDescriptions[originalIndex],
-  //             audioFile: audioFileData.audio_file,
-  //           };
-  //           console.log(`Updated audio at index ${originalIndex}`);
-  //         }
-  //       }
-  //     );
-
-  //     // Update state with the modified copy
-  //     setVideoDescriptions(updatedDescriptions);
-  //   } catch (error) {
-  //     console.error("Error regenerating audio:", error);
-  //   }
-  // };
-
-  // const handleRegenerateAudio = async (): Promise<void> => {
-  //   const updatedDescriptions = [...videoDescriptions];
-  //   const regenerationIndices: number[] = [];
-  //   const regenerationPayload: any[] = [];
-
-  //   updatedDescriptions.forEach((item, index) => {
-  //     // Only process selected scenes that aren't TALKING
-  //     if (
-  //       selectedScenes.has(item.startTime) &&
-  //       !item.description.toUpperCase().includes("TALKING")
-  //     ) {
-  //       regenerationIndices.push(index);
-  //       regenerationPayload.push({
-  //         description: item.description,
-  //         timestamps: [Number(item.startTime), Number(item.endTime)],
-  //         scene_id: item.startTime,
-  //       });
-  //     }
-  //   });
-
-  //   if (regenerationPayload.length === 0) {
-  //     console.log("No selected scenes need audio regeneration.");
-  //     return;
-  //   }
-
-  //   try {
-  //     const response = await fetch("http://localhost:5000/text-to-speech", {
-  //       method: "POST",
-  //       headers: { "Content-Type": "application/json" },
-  //       body: JSON.stringify(regenerationPayload),
-  //     });
-
-  //     if (!response.ok) throw new Error("Failed to regenerate audio");
-
-  //     const data = await response.json();
-  //     data.audio_files.forEach(
-  //       (audioFileData: { audio_file: string }, responseIndex: number) => {
-  //         const originalIndex = regenerationIndices[responseIndex];
-  //         if (
-  //           originalIndex !== undefined &&
-  //           updatedDescriptions[originalIndex]
-  //         ) {
-  //           updatedDescriptions[originalIndex] = {
-  //             ...updatedDescriptions[originalIndex],
-  //             audioFile: audioFileData.audio_file,
-  //           };
-  //         }
-  //       }
-  //     );
-
-  //     setVideoDescriptions(updatedDescriptions);
-  //   } catch (error) {
-  //     console.error("Audio regeneration error:", error);
-  //   }
-  // };
-
   const handleRegenerateAudio = async (): Promise<void> => {
     if (selectedScenes.size === 0) {
       alert("Please select scenes to regenerate audio");
@@ -533,11 +494,66 @@ const Workspace3: React.FC = () => {
     }
   };
 
+  const generateThumbnail = (videoFile: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const video = document.createElement("video");
+      video.preload = "metadata";
+
+      video.onloadedmetadata = () => {
+        const randomTime = Math.random() * video.duration;
+        video.currentTime = randomTime;
+      };
+
+      video.onseeked = () => {
+        const canvas = document.createElement("canvas");
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        const ctx = canvas.getContext("2d");
+        ctx?.drawImage(video, 0, 0, canvas.width, canvas.height);
+        const dataURL = canvas.toDataURL("image/jpeg");
+        resolve(dataURL);
+      };
+
+      video.onerror = (error) => {
+        reject(error);
+      };
+
+      video.src = URL.createObjectURL(videoFile);
+    });
+  };
+
   const handleSave = async () => {
     if (videoDescriptions.length === 0) {
       alert("Please process a video and ensure descriptions are available.");
       return;
     }
+
+    const currentDate = new Date().toLocaleDateString();
+
+    console.log("Project name", projectName);
+    let screenshot = "";
+    if (uploadedVideo) {
+      try {
+        screenshot = await generateThumbnail(uploadedVideo);
+      } catch (error) {
+        console.error("Error generating thumbnail:", error);
+        alert("Failed to generate thumbnail.");
+      }
+    }
+
+    // Save the video descriptions to local storage
+    setVideoDescriptionsStorage([
+      ...(videoDescriptionsStorage || []).filter(
+        (item) => item.name !== projectName
+      ),
+      {
+        name: projectName,
+        data: videoDescriptions,
+        date: currentDate,
+        videoName: videoName || "",
+        screenshot: screenshot,
+      },
+    ]);
 
     alert("Your work has been successfully saved!");
   };
@@ -610,72 +626,6 @@ const Workspace3: React.FC = () => {
     }
   };
 
-  const BackgroundSVG = () => (
-    <svg
-      className="absolute inset-0 w-full h-full z-0"
-      viewBox="0 0 1440 900"
-      preserveAspectRatio="none"
-    >
-      {/* Base gradient */}
-      <defs>
-        <linearGradient id="mainGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop
-            offset="0%"
-            style={{ stopColor: "#4f46e5", stopOpacity: 0.2 }}
-          />
-          <stop
-            offset="50%"
-            style={{ stopColor: "#7c3aed", stopOpacity: 0.15 }}
-          />
-          <stop
-            offset="100%"
-            style={{ stopColor: "#4338ca", stopOpacity: 0.25 }}
-          />
-        </linearGradient>
-
-        {/* Random blob shapes */}
-        <filter id="noise">
-          <feTurbulence
-            type="fractalNoise"
-            baseFrequency="0.8"
-            numOctaves="4"
-          />
-          <feDisplacementMap in="SourceGraphic" scale="20" />
-        </filter>
-      </defs>
-
-      {/* Background rectangle */}
-      <rect width="100%" height="100%" fill="url(#mainGradient)" />
-
-      {/* Color blobs */}
-      <path
-        d="M200 150 Q 300 50 400 150 T 600 150 T 800 50 T 1000 150 T 1200 50"
-        fill="#6366f1"
-        opacity="0.1"
-        filter="url(#noise)"
-      />
-
-      <circle cx="80%" cy="30%" r="120" fill="#8b5cf6" opacity="0.08" />
-      <ellipse
-        cx="20%"
-        cy="70%"
-        rx="180"
-        ry="120"
-        fill="#a855f7"
-        opacity="0.12"
-      />
-      <rect
-        x="60%"
-        y="60%"
-        width="300"
-        height="200"
-        fill="#7c3aed"
-        opacity="0.1"
-        transform="rotate(45)"
-      />
-    </svg>
-  );
-
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
@@ -684,265 +634,6 @@ const Workspace3: React.FC = () => {
       console.log("Uploaded Video:", file.name); // Log the file name
     }
   };
-
-  // const handleGenerateDescriptions = async (): Promise<void> => {
-  //   if (selectedScenes.size === 0) {
-  //     alert("Please select scenes to generate descriptions");
-  //     return;
-  //   }
-
-  //   // Ensure uploadedVideo is not null and has a name
-  //   if (!uploadedVideo || !uploadedVideo.name) {
-  //     alert("No video uploaded. Please upload a video before generating descriptions.");
-  //     return;
-  //   }
-
-  //   try {
-  //     const selectedSceneData = videoDescriptions
-  //       .filter((scene) => selectedScenes.has(scene.startTime))
-  //       .map((scene) => ({
-  //         start: scene.startTime,
-  //         end: scene.endTime,
-  //         current_description: scene.description,
-  //       }));
-
-  //     const payload = {
-  //       video_name: uploadedVideo.name, // Ensure this is set correctly
-  //       scenes: selectedSceneData,
-  //     };
-
-  //     console.log("Payload being sent:", payload); // Log the payload
-
-  //     const response = await fetch("http://localhost:5000/regenerate-descriptions", {
-  //       method: "POST",
-  //       headers: { "Content-Type": "application/json" },
-  //       body: JSON.stringify(payload),
-  //     });
-
-  //     if (!response.ok) throw new Error("Failed to generate descriptions");
-
-  //     const newDescriptions = await response.json();
-  //     const updatedDescriptions = videoDescriptions.map((scene) => {
-  //       const newScene = newDescriptions.descriptions.find(
-  //         (n) => n.start === scene.startTime && n.end === scene.endTime
-  //       );
-  //       return newScene ? { ...scene, ...newScene, isEdited: true } : scene;
-  //     });
-
-  //     setVideoDescriptions(updatedDescriptions);
-  //     setPreviousDescriptions(updatedDescriptions);
-  //     alert("Descriptions updated successfully!");
-  //   } catch (error) {
-  //     console.error("Description generation error:", error);
-  //     alert(`Error: ${error instanceof Error ? error.message : "Unknown error"}`);
-  //   }
-  // };
-
-  // const handleGenerateDescriptions = async (): Promise<void> => {
-  //   if (selectedScenes.size === 0) {
-  //     alert("Please select scenes to generate descriptions");
-  //     return;
-  //   }
-
-  //   if (!uploadedVideo || !uploadedVideo.name) {
-  //     alert(
-  //       "No video uploaded. Please upload a video before generating descriptions."
-  //     );
-  //     return;
-  //   }
-
-  //   try {
-  //     const selectedSceneData = videoDescriptions
-  //       .filter((scene) => selectedScenes.has(scene.startTime))
-  //       .map((scene) => ({
-  //         start: scene.startTime,
-  //         end: scene.endTime,
-  //         current_description: scene.description,
-  //       }));
-
-  //     const payload = {
-  //       video_name: uploadedVideo.name,
-  //       scenes: selectedSceneData,
-  //     };
-
-  //     console.log("Payload being sent:", payload);
-
-  //     const response = await fetch(
-  //       "http://localhost:5000/regenerate-descriptions",
-  //       {
-  //         method: "POST",
-  //         headers: { "Content-Type": "application/json" },
-  //         body: JSON.stringify(payload),
-  //       }
-  //     );
-
-  //     if (!response.ok || !response.body) {
-  //       throw new Error("Failed to generate descriptions");
-  //     }
-
-  //     const reader = response.body.getReader();
-  //     const decoder = new TextDecoder();
-  //     let updatedDescriptions = [...videoDescriptions];
-
-  //     while (true) {
-  //       const { done, value } = await reader.read();
-  //       if (done) break;
-
-  //       const chunks = decoder.decode(value).split("\n");
-  //       for (const chunk of chunks) {
-  //         if (!chunk) continue;
-
-  //         try {
-  //           const data = JSON.parse(chunk);
-
-  //           // Handle progress updates
-  //           if (data.progress !== undefined) {
-  //             setProcessingProgress(data.progress);
-  //             setProcessingMessage(data.message || "");
-  //           }
-
-  //           // Handle final response with updated descriptions
-  //           if (data.progress === 100 && data.data) {
-  //             updatedDescriptions = updatedDescriptions.map((scene) => {
-  //               const newScene = data.data.descriptions.find(
-  //                 (n: any) =>
-  //                   n.start === scene.startTime && n.end === scene.endTime
-  //               );
-  //               return newScene
-  //                 ? { ...scene, ...newScene, isEdited: true }
-  //                 : scene;
-  //             });
-  //           }
-
-  //           // Handle errors
-  //           if (data.error) {
-  //             throw new Error(data.error);
-  //           }
-  //         } catch (e) {
-  //           console.error("Error parsing JSON chunk:", e);
-  //         }
-  //       }
-  //     }
-
-  //     // Update state with final descriptions
-  //     setVideoDescriptions(updatedDescriptions);
-  //     setPreviousDescriptions(updatedDescriptions);
-  //     alert("Descriptions updated successfully!");
-  //   } catch (error) {
-  //     console.error("Description generation error:", error);
-  //     alert(
-  //       `Error: ${error instanceof Error ? error.message : "Unknown error"}`
-  //     );
-  //   } finally {
-  //     setProcessingProgress(0);
-  //     setProcessingMessage("");
-  //   }
-  // };
-
-  // const handleGenerateDescriptions = async (): Promise<void> => {
-  //   if (selectedScenes.size === 0) {
-  //     alert("Please select scenes to generate descriptions");
-  //     return;
-  //   }
-
-  //   if (!uploadedVideo || !uploadedVideo.name) {
-  //     alert(
-  //       "No video uploaded. Please upload a video before generating descriptions."
-  //     );
-  //     return;
-  //   }
-
-  //   try {
-  //     const selectedSceneData = videoDescriptions
-  //       .filter((scene) => selectedScenes.has(scene.startTime))
-  //       .map((scene) => ({
-  //         start: scene.startTime,
-  //         end: scene.endTime,
-  //         current_description: scene.description,
-  //       }));
-
-  //     const payload = {
-  //       video_name: uploadedVideo.name,
-  //       scenes: selectedSceneData,
-  //     };
-
-  //     console.log("Payload being sent:", payload);
-
-  //     const response = await fetch(
-  //       "http://localhost:5000/regenerate-descriptions",
-  //       {
-  //         method: "POST",
-  //         headers: { "Content-Type": "application/json" },
-  //         body: JSON.stringify(payload),
-  //       }
-  //     );
-
-  //     if (!response.ok || !response.body) {
-  //       throw new Error("Failed to generate descriptions");
-  //     }
-
-  //     const reader = response.body.getReader();
-  //     const decoder = new TextDecoder();
-  //     let updatedDescriptions = [...videoDescriptions];
-
-  //     while (true) {
-  //       const { done, value } = await reader.read();
-  //       if (done) break;
-
-  //       const chunks = decoder.decode(value).split("\n");
-  //       for (const chunk of chunks) {
-  //         if (!chunk) continue;
-
-  //         try {
-  //           const data = JSON.parse(chunk);
-
-  //           // Handle progress updates
-  //           if (data.progress !== undefined) {
-  //             setProcessingProgress(data.progress);
-  //             setProcessingMessage(data.message || "");
-  //           }
-
-  //           // Handle final response with updated descriptions
-  //           if (data.progress === 100 && data.data) {
-  //             updatedDescriptions = updatedDescriptions.map((scene) => {
-  //               const newScene = data.data.descriptions.find(
-  //                 (n: any) =>
-  //                   n.start === scene.startTime && n.end === scene.endTime
-  //               );
-  //               return newScene
-  //                 ? {
-  //                     ...scene,
-  //                     description: newScene.description,
-  //                     isEdited: true,
-  //                   }
-  //                 : scene;
-  //             });
-  //           }
-
-  //           // Handle errors
-  //           if (data.error) {
-  //             throw new Error(data.error);
-  //           }
-  //         } catch (e) {
-  //           console.error("Error parsing JSON chunk:", e);
-  //         }
-  //       }
-  //     }
-
-  //     // Update state with final descriptions
-  //     setVideoDescriptions(updatedDescriptions);
-  //     setPreviousDescriptions(updatedDescriptions);
-  //     alert("Descriptions updated successfully!");
-  //   } catch (error) {
-  //     console.error("Description generation error:", error);
-  //     alert(
-  //       `Error: ${error instanceof Error ? error.message : "Unknown error"}`
-  //     );
-  //   } finally {
-  //     setProcessingProgress(0);
-  //     setProcessingMessage("");
-  //   }
-  // };
 
   const handleGenerateDescriptions = async (): Promise<void> => {
     if (selectedScenes.size === 0) {
@@ -1007,7 +698,7 @@ const Workspace3: React.FC = () => {
 
             // Handle final response with updated descriptions
             if (data.progress === 100 && data.data) {
-              console.log(data.data)
+              console.log(data.data);
               updatedDescriptions = updatedDescriptions.map((scene, index) => ({
                 ...scene,
                 description: data.data.descriptions[index] || scene.description,
@@ -1043,6 +734,10 @@ const Workspace3: React.FC = () => {
     }
   };
 
+  const toggleSlideInModal = () => {
+    setIsSlideInModalOpen(!isSlideInModalOpen);
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-indigo-900/100 via-purple-700/100 to-indigo-600/100 flex flex-col">
       <main className="flex-grow h-screen overflow-hidden">
@@ -1052,6 +747,7 @@ const Workspace3: React.FC = () => {
           uploadedVideo={uploadedVideo}
           onProcessVideo={handleProcessVideo}
           setUploadedVideo={setUploadedVideo}
+          setVideoName={setVideoName}
           handleEncodeVideo={handleEncodeVideo}
           toggleAudioDescription={toggleAudioDescription}
           handleAnalyzeVideo={handleProcessVideo}
@@ -1066,15 +762,42 @@ const Workspace3: React.FC = () => {
           onGenerateDescriptions={handleGenerateDescriptions}
           onRegenerateAudio={handleRegenerateAudio}
         />
-        {/* Add a reload button */}
-        <div className="fixed bottom-4 right-4">
-          <Button
-            variant="secondary"
-            className={`${buttonStyles.base} ${buttonStyles.variants.secondary} p-3 rounded-full shadow-lg backdrop-blur-sm`}
-            onClick={reloadPreviousDescriptions}
+        <div
+          className={`fixed bottom-4 right-4 flex flex-col items-center transition-transform duration-300 ${
+            isSlideInModalOpen
+              ? "translate-y-0"
+              : "translate-y-[calc(100%-2rem)]"
+          }`}
+        >
+          {/* Chevron Button - Centered Above */}
+          <button
+            className="bg-gray-800 hover:bg-gray-700 text-gray-100 p-2 rounded-full shadow-lg backdrop-blur-md transition-all duration-300"
+            onClick={toggleSlideInModal}
           >
-            <RefreshCw className="w-6 h-6" />
-          </Button>
+            {isSlideInModalOpen ? (
+              <ChevronDown className="w-5 h-5" />
+            ) : (
+              <ChevronUp className="w-5 h-5" />
+            )}
+          </button>
+
+          {/* Slide-in Modal */}
+          <div className="bg-white bg-opacity-90 shadow-xl backdrop-blur-lg p-4 rounded-2xl flex flex-col items-center gap-3 mt-2">
+            <Button
+              variant="secondary"
+              className="p-3 rounded-full shadow-md hover:bg-gray-200 transition"
+              onClick={reloadPreviousDescriptions}
+            >
+              <RefreshCw className="w-6 h-6" />
+            </Button>
+            <Button
+              variant="default"
+              className="p-3 rounded-full shadow-md hover:bg-blue-600 transition"
+              onClick={handleSave}
+            >
+              <Save className="w-6 h-6" />
+            </Button>
+          </div>
         </div>
       </main>
     </div>

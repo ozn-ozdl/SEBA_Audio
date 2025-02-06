@@ -34,6 +34,7 @@ interface VideoTimelineProps {
   uploadedVideo: File | null;
   onProcessVideo: (videoFile: File, action: string) => Promise<void>;
   setUploadedVideo: (file: File | null) => void;
+  setVideoName: (name: string) => void;
   handleEncodeVideo: (videofile: File) => void;
   toggleAudioDescription: () => void;
   handleAnalyzeVideo: (videoFile: File, action: string) => Promise<void>;
@@ -86,6 +87,7 @@ export const TranscriptionEditor: React.FC<VideoTimelineProps> = ({
   processingMessage,
   onGenerateDescriptions,
   onRegenerateAudio,
+  setVideoName,
 }) => {
   const [state, setState] = useState({
     isPlaying: false,
@@ -163,6 +165,7 @@ export const TranscriptionEditor: React.FC<VideoTimelineProps> = ({
         videoFile: file,
       });
       setUploadedVideo(file);
+      setVideoName(file.name);
     }
   };
 

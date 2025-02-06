@@ -13,7 +13,7 @@ interface DescriptionsSidebarProps {
 const calculateWPM = (startTime: number, endTime: number, text: string) => {
   const durationInMinutes = (endTime - startTime) / 60000; // Convert ms to min
   const wordCount = text.trim().split(/\s+/).length; // Count words
-  return durationInMinutes > 0 ? (wordCount / durationInMinutes) : 0; // WPM calculation
+  return durationInMinutes > 0 ? wordCount / durationInMinutes : 0; // WPM
 };
 
 const getColorForWPM = (wpm: number) => {
@@ -33,20 +33,22 @@ export const DescriptionsSidebar: React.FC<DescriptionsSidebarProps> = ({
 }) => {
   const updateSceneText = (startTime: number, newText: string) => {
     const updatedDescriptions = descriptions.map((scene) =>
-      scene.startTime === startTime ? { ...scene, description: newText, isEdited: true } : scene
+      scene.startTime === startTime
+        ? { ...scene, description: newText, isEdited: true }
+        : scene,
     );
     onDescriptionChange(updatedDescriptions);
   };
 
   const deleteDescription = (startTime: number) => {
     const updatedDescriptions = descriptions.filter(
-      (scene) => scene.startTime !== startTime
+      (scene) => scene.startTime !== startTime,
     );
     onDescriptionChange(updatedDescriptions);
   };
 
   return (
-    <div className="w-80 border-l border-gray-700 overflow-y-auto p-4 bg-gray-900/80 backdrop-blur-lg">
+    <div className="w-[30rem] border-l border-gray-700 overflow-y-auto p-4 bg-gray-900/80 backdrop-blur-lg">
       {/* Header */}
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-xl font-semibold text-gray-100">
@@ -64,7 +66,11 @@ export const DescriptionsSidebar: React.FC<DescriptionsSidebarProps> = ({
       {descriptions
         .filter((scene) => scene.description !== "TALKING")
         .map((scene) => {
-          const wpm = calculateWPM(scene.startTime, scene.endTime, scene.description);
+          const wpm = calculateWPM(
+            scene.startTime,
+            scene.endTime,
+            scene.description,
+          );
           const wpmColor = getColorForWPM(wpm);
 
           return (
@@ -106,7 +112,9 @@ export const DescriptionsSidebar: React.FC<DescriptionsSidebarProps> = ({
                 rows={3}
                 value={scene.description}
                 placeholder="Describe this scene..."
-                onChange={(e) => updateSceneText(scene.startTime, e.target.value)}
+                onChange={(e) =>
+                  updateSceneText(scene.startTime, e.target.value)
+                }
               />
             </div>
           );
