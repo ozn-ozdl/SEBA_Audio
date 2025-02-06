@@ -13,6 +13,8 @@ import tempfile
 from gtts import gTTS
 import os
 import re
+from uuid import uuid4
+
 
 app = Flask(__name__)
 app.config['MAX_CONTENT_LENGTH'] = 30 * 1024 * 1024
@@ -41,6 +43,7 @@ def setup():
         shutil.rmtree(SCENES_FOLDER)
     os.makedirs(SCENES_FOLDER, exist_ok=True)
 
+setup()
 
 @app.route("/")
 def hello_geek():
@@ -59,8 +62,6 @@ def process_video():
     if "video" not in request.files:
         return jsonify({"error": "No video file provided"}), 400
 
-    setup()
-
     video_file = request.files["video"]
     action = request.form.get("action")
 
@@ -68,6 +69,10 @@ def process_video():
     video_file.save(video_path)
 
     try:
+        unique_id = str(uuid4())  # Generating Unique ID for each Scene Folder
+        scenes_subfolder = os.path.join(SCENES_FOLDER, unique_id)
+        os.makedirs(scenes_subfolder, exist_ok=True)
+
         if action == "openAI_image":
             vtf.extract_frames_from_video(video_path, FRAMES_FOLDER, 2)
             scene_changes = dsc.detect_scene_changes(FRAMES_FOLDER, 0.3, 0.4)
@@ -112,13 +117,15 @@ def process_video():
                 detected_scenes = sg.combine_speaking_and_scenes(
                     scenes_timestamps, talking_timestamps)
 
+
             scene_descriptions, timestamps, scene_files = sg.describe_scenes_with_gemini_video(
-                video_path, detected_scenes, SCENES_FOLDER)
+                video_path, detected_scenes, scenes_subfolder)
             return jsonify({
                 "message": "Scene changes detected successfully",
                 "descriptions": scene_descriptions,
                 "timestamps": timestamps,
                 "scene_files": scene_files,
+                "request_id": unique_id
             }), 200
 
         else:
