@@ -57,6 +57,60 @@ const TimelineVisualizer: React.FC<TimelineVisualizerProps> = ({
   const [scrollPosition, setScrollPosition] = useState(0);
   const [containerWidth, setContainerWidth] = useState(0);
   const [audioDurations, setAudioDurations] = useState<AudioDurations>({});
+  const [startX, setStartX] = useState<number | null>(null); // Track touch start position
+
+  // Define handleWheel function
+  const handleWheel = (e: WheelEvent) => {
+    if (timelineRef.current) {
+      e.preventDefault();
+      timelineRef.current.scrollLeft += e.deltaY;
+    }
+  };
+
+  // Handle touch start
+  const handleTouchStart = (e: TouchEvent) => {
+    if (timelineRef.current) {
+      setStartX(e.touches[0].clientX); // Store the initial touch position
+      setIsDragging(true);
+    }
+  };
+
+  // Handle touch move
+  const handleTouchMove = (e: TouchEvent) => {
+    if (isDragging && timelineRef.current && startX !== null) {
+      const touchX = e.touches[0].clientX;
+      const deltaX = startX - touchX; // Calculate the distance moved
+      timelineRef.current.scrollLeft += deltaX; // Scroll the timeline
+      setStartX(touchX); // Update the start position for the next move
+    }
+  };
+
+  // Handle touch end
+  const handleTouchEnd = () => {
+    setIsDragging(false); // Reset dragging state
+    setStartX(null); // Clear the start position
+  };
+
+  useEffect(() => {
+    const timelineElement = timelineRef.current;
+    if (timelineElement) {
+      timelineElement.addEventListener("wheel", handleWheel, {
+        passive: false,
+      });
+      timelineElement.addEventListener("touchstart", handleTouchStart);
+      timelineElement.addEventListener("touchmove", handleTouchMove);
+      timelineElement.addEventListener("touchend", handleTouchEnd);
+    }
+
+    return () => {
+      if (timelineElement) {
+        timelineElement.removeEventListener("wheel", handleWheel);
+        timelineElement.removeEventListener("touchstart", handleTouchStart);
+        timelineElement.removeEventListener("touchmove", handleTouchMove);
+        timelineElement.removeEventListener("touchend", handleTouchEnd);
+      }
+    };
+  }, [isDragging, startX]);
 
   const pixelsToTime = (pixels: number): string => {
     const totalMs = pixels * 10; // 1 pixel = 10ms
@@ -158,12 +212,27 @@ const TimelineVisualizer: React.FC<TimelineVisualizerProps> = ({
     setContainers(newContainers);
   };
 
-  const handleWheel = (e: React.WheelEvent<HTMLDivElement>) => {
-    if (timelineRef.current) {
-      e.preventDefault();
-      timelineRef.current.scrollLeft += e.deltaY;
+  useEffect(() => {
+    const handleWheel = (e: WheelEvent) => {
+      if (timelineRef.current) {
+        e.preventDefault();
+        timelineRef.current.scrollLeft += e.deltaY;
+      }
+    };
+
+    const timelineElement = timelineRef.current;
+    if (timelineElement) {
+      timelineElement.addEventListener("wheel", handleWheel, {
+        passive: false,
+      });
     }
-  };
+
+    return () => {
+      if (timelineElement) {
+        timelineElement.removeEventListener("wheel", handleWheel);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     elements.forEach((element) => {
@@ -217,6 +286,78 @@ const TimelineVisualizer: React.FC<TimelineVisualizerProps> = ({
   //   });
   // };
 
+  // const addNewScene = () => {
+  //   const currentTimeMs = currentTime * 1000; // Convert to milliseconds
+  //   const currentPosition = currentTimeMs / 10; // Convert to pixels (1px = 10ms)
+
+  //   // Prevent adding if current time overlaps any existing element
+  //   const hasOverlap = elements.some(
+  //     (el) => currentTimeMs >= el.startTime && currentTimeMs < el.endTime
+  //   );
+  //   if (hasOverlap) return;
+
+  //   // Find surrounding elements
+  //   const sortedElements = [...elements].sort(
+  //     (a, b) => a.position - b.position
+  //   );
+
+  //   // Find first element that starts after current position
+  //   const nextElement = sortedElements.find(
+  //     (el) => el.position > currentPosition
+  //   );
+  //   // Find last element that ends before current position
+  //   const previousElements = sortedElements.filter(
+  //     (el) => el.position + el.width <= currentPosition
+  //   );
+  //   const previousElement = previousElements[previousElements.length - 1];
+
+  //   // Calculate available space
+  //   const previousEnd = previousElement
+  //     ? previousElement.position + previousElement.width
+  //     : 0;
+  //   const nextStart = nextElement ? nextElement.position : timelineWidth;
+
+  //   // Ensure valid placement and minimum width
+  //   const availableWidth = nextStart - currentPosition;
+  //   if (availableWidth < 50 || currentPosition < previousEnd) return;
+
+  //   const newSceneElement: TimelineElement = {
+  //     id: 0, // Temporary ID
+  //     text: "New Scene",
+  //     position: currentPosition,
+  //     width: availableWidth, // Fill available space
+  //     startTime: currentTimeMs,
+  //     endTime: currentTimeMs + availableWidth * 10,
+  //     audioFile: undefined,
+  //     isEdited: false, // Default to false
+  //   };
+
+  //   setElements((prev) => {
+  //     const updatedElements = [...prev, newSceneElement].sort(
+  //       (a, b) => a.position - b.position
+  //     );
+
+  //     // Reassign sequential IDs
+  //     const reassignedElements = updatedElements.map((el, index) => ({
+  //       ...el,
+  //       id: index + 1,
+  //     }));
+
+  //     // Update parent component
+  //     onDescriptionChange(
+  //       reassignedElements.map((el) => ({
+  //         startTime: el.startTime,
+  //         endTime: el.endTime,
+  //         description: el.text,
+  //         audioFile: el.audioFile,
+  //         isEdited: false,
+  //       }))
+  //     );
+
+  //     return reassignedElements;
+  //   });
+  // };
+
   const addNewScene = () => {
     const currentTimeMs = currentTime * 1000; // Convert to milliseconds
     const currentPosition = currentTimeMs / 10; // Convert to pixels (1px = 10ms)
@@ -260,7 +401,7 @@ const TimelineVisualizer: React.FC<TimelineVisualizerProps> = ({
       startTime: currentTimeMs,
       endTime: currentTimeMs + availableWidth * 10,
       audioFile: undefined,
-      isEdited: false, // Default to false
+      isEdited: false, // Default to false for the new element
     };
 
     setElements((prev) => {
@@ -274,14 +415,14 @@ const TimelineVisualizer: React.FC<TimelineVisualizerProps> = ({
         id: index + 1,
       }));
 
-      // Update parent component
+      // Update parent component without changing existing isEdited flags
       onDescriptionChange(
         reassignedElements.map((el) => ({
           startTime: el.startTime,
           endTime: el.endTime,
           description: el.text,
           audioFile: el.audioFile,
-          isEdited: false,
+          isEdited: el.isEdited, // Keep existing isEdited flags
         }))
       );
 
@@ -485,6 +626,183 @@ const TimelineVisualizer: React.FC<TimelineVisualizerProps> = ({
   //   updateContainers(newElements); // Update containers in real-time
   // };
 
+  // const handleResize = (
+  //   elementId: number,
+  //   direction: string,
+  //   ref: HTMLElement,
+  //   delta: { width: number; height: number },
+  //   position: { x: number; y: number }
+  // ) => {
+  //   const container = containers.find((c) => c.id === elementId);
+  //   if (!container) return;
+
+  //   // Get actual pixel dimensions from the element
+  //   const currentWidth = parseFloat(ref.style.width);
+  //   const currentLeft = parseFloat(ref.style.left);
+
+  //   // Convert to timeline-absolute coordinates
+  //   const absolutePosition = container.startPosition + position["x"];
+  //   const absoluteRight = absolutePosition + currentWidth;
+
+  //   // Find neighboring elements
+  //   const sortedElements = [...elements].sort(
+  //     (a, b) => a.position - b.position
+  //   );
+  //   const currentIndex = sortedElements.findIndex((e) => e.id === elementId);
+
+  //   // Calculate boundaries
+  //   const prevElement = sortedElements[currentIndex - 1];
+  //   const nextElement = sortedElements[currentIndex + 1];
+
+  //   const minPosition = prevElement
+  //     ? prevElement.position + prevElement.width
+  //     : 0;
+  //   const maxPosition = nextElement ? nextElement.position : timelineWidth;
+
+  //   // Calculate new dimensions
+  //   let newWidth = currentWidth;
+  //   let newPosition = absolutePosition;
+
+  //   if (direction === "right") {
+  //     newWidth = Math.min(
+  //       Math.max(50, absoluteRight - newPosition),
+  //       maxPosition - newPosition
+  //     );
+  //   } else if (direction === "left") {
+  //     newPosition = Math.max(minPosition, absolutePosition);
+  //     newWidth = Math.min(
+  //       Math.max(50, absoluteRight - newPosition),
+  //       maxPosition - newPosition
+  //     );
+  //   }
+
+  //   // Update elements
+  //   const newElements = elements.map((el) =>
+  //     el.id === elementId
+  //       ? {
+  //           ...el,
+  //           position: newPosition,
+  //           width: newWidth,
+  //           startTime: newPosition * 10,
+  //           endTime: (newPosition + newWidth) * 10,
+  //         }
+  //       : el
+  //   );
+
+  //   setElements(newElements);
+  //   updateContainers(newElements); // Update containers in real-time
+  // };
+
+  // const handleResize = (
+  //   elementId: number,
+  //   direction: string,
+  //   ref: HTMLElement,
+  //   delta: { width: number; height: number },
+  //   position: { x: number; y: number }
+  // ) => {
+  //   resizingRef.current = true; // Set resizing flag
+  //   const container = containers.find((c) => c.id === elementId);
+  //   if (!container) return;
+
+  //   // Get actual pixel dimensions from the element
+  //   const currentWidth = parseFloat(ref.style.width);
+  //   const currentLeft = parseFloat(ref.style.left);
+
+  //   // Convert to timeline-absolute coordinates
+  //   const absolutePosition = container.startPosition + position["x"];
+  //   const absoluteRight = absolutePosition + currentWidth;
+
+  //   // Find neighboring elements
+  //   const sortedElements = [...elements].sort(
+  //     (a, b) => a.position - b.position
+  //   );
+  //   const currentIndex = sortedElements.findIndex((e) => e.id === elementId);
+
+  //   // Calculate boundaries
+  //   const prevElement = sortedElements[currentIndex - 1];
+  //   const nextElement = sortedElements[currentIndex + 1];
+
+  //   const minPosition = prevElement
+  //     ? prevElement.position + prevElement.width
+  //     : 0;
+  //   const maxPosition = nextElement ? nextElement.position : timelineWidth;
+
+  //   // Calculate new dimensions
+  //   let newWidth = currentWidth;
+  //   let newPosition = absolutePosition;
+
+  //   if (direction === "right") {
+  //     newWidth = Math.min(
+  //       Math.max(50, absoluteRight - newPosition),
+  //       maxPosition - newPosition
+  //     );
+  //   } else if (direction === "left") {
+  //     newPosition = Math.max(minPosition, absolutePosition);
+  //     newWidth = Math.min(
+  //       Math.max(50, absoluteRight - newPosition),
+  //       maxPosition - newPosition
+  //     );
+  //   }
+
+  //   // Update elements with continuous time updates
+  //   const newElements = elements.map((el) =>
+  //     el.id === elementId
+  //       ? {
+  //           ...el,
+  //           position: newPosition,
+  //           width: newWidth,
+  //           startTime: newPosition * 10,
+  //           endTime: (newPosition + newWidth) * 10,
+  //         }
+  //       : el
+  //   );
+
+  //   setElements(newElements);
+  //   updateContainers(newElements); // Update containers in real-time
+  // };
+
+  // const handleResizeStop = (
+  //   elementId: number,
+  //   direction: string,
+  //   ref: HTMLElement,
+  //   delta: { width: number; height: number },
+  //   position: { x: number; y: number }
+  // ) => {
+  //   resizingRef.current = false; // Reset resizing flag
+
+  //   const container = containers.find((c) => c.id === elementId);
+  //   if (!container) return;
+
+  //   const currentWidth = parseFloat(ref.style.width);
+  //   const absolutePosition = container.startPosition + position["x"];
+
+  //   const newElements = elements.map((el) =>
+  //     el.id === elementId
+  //       ? {
+  //           ...el,
+  //           position: absolutePosition,
+  //           width: currentWidth,
+  //           startTime: absolutePosition * 10,
+  //           endTime: (absolutePosition + currentWidth) * 10,
+  //         }
+  //       : el
+  //   );
+
+  //   setElements(newElements);
+  //   updateContainers(newElements);
+
+  //   // Update parent component with final changes
+  //   const updatedDescriptions = newElements.map((el) => ({
+  //     startTime: el.startTime,
+  //     endTime: el.endTime,
+  //     description: el.text,
+  //     audioFile: el.audioFile,
+  //     isEdited: true, // Mark as edited
+  //   }));
+
+  //   onDescriptionChange(updatedDescriptions);
+  // };
+
   const handleResize = (
     elementId: number,
     direction: string,
@@ -492,6 +810,7 @@ const TimelineVisualizer: React.FC<TimelineVisualizerProps> = ({
     delta: { width: number; height: number },
     position: { x: number; y: number }
   ) => {
+    resizingRef.current = true; // Set resizing flag
     const container = containers.find((c) => c.id === elementId);
     if (!container) return;
 
@@ -535,7 +854,7 @@ const TimelineVisualizer: React.FC<TimelineVisualizerProps> = ({
       );
     }
 
-    // Update elements
+    // Update elements without changing isEdited flag
     const newElements = elements.map((el) =>
       el.id === elementId
         ? {
@@ -544,12 +863,57 @@ const TimelineVisualizer: React.FC<TimelineVisualizerProps> = ({
             width: newWidth,
             startTime: newPosition * 10,
             endTime: (newPosition + newWidth) * 10,
+            // Keep isEdited unchanged
           }
         : el
     );
 
     setElements(newElements);
     updateContainers(newElements); // Update containers in real-time
+  };
+
+  const handleResizeStop = (
+    elementId: number,
+    direction: string,
+    ref: HTMLElement,
+    delta: { width: number; height: number },
+    position: { x: number; y: number }
+  ) => {
+    resizingRef.current = false; // Reset resizing flag
+
+    const container = containers.find((c) => c.id === elementId);
+    if (!container) return;
+
+    const currentWidth = parseFloat(ref.style.width);
+    const absolutePosition = container.startPosition + position["x"];
+
+    // Update elements without changing isEdited flag
+    const newElements = elements.map((el) =>
+      el.id === elementId
+        ? {
+            ...el,
+            position: absolutePosition,
+            width: currentWidth,
+            startTime: absolutePosition * 10,
+            endTime: (absolutePosition + currentWidth) * 10,
+            // Keep isEdited unchanged
+          }
+        : el
+    );
+
+    setElements(newElements);
+    updateContainers(newElements);
+
+    // Update parent component with final changes
+    const updatedDescriptions = newElements.map((el) => ({
+      startTime: el.startTime,
+      endTime: el.endTime,
+      description: el.text,
+      audioFile: el.audioFile,
+      isEdited: el.isEdited, // Keep existing isEdited flags
+    }));
+
+    onDescriptionChange(updatedDescriptions);
   };
 
   const handleTimelineClick = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -637,7 +1001,7 @@ const TimelineVisualizer: React.FC<TimelineVisualizerProps> = ({
     <div
       className="relative w-full h-40 overflow-hidden backdrop-blur-sm"
       ref={timelineRef}
-      onWheel={handleWheel}
+      // onWheel={handleWheel}
       style={{ cursor: "grab" }}
     >
       {/* Add Scene Button */}
@@ -713,7 +1077,7 @@ const TimelineVisualizer: React.FC<TimelineVisualizerProps> = ({
                   handleResize(id, dir, ref, delta, pos)
                 }
                 onResizeStop={(e, dir, ref, delta, pos) =>
-                  handleResize(id, dir, ref, delta, pos)
+                  handleResizeStop(id, dir, ref, delta, pos)
                 }
                 resizeHandleStyles={{
                   left: {

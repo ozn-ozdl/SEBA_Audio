@@ -27,7 +27,6 @@ interface SceneSelectionModalProps {
   onRegenerateAudio: () => void;
   onSelectScene: (sceneStartTime: number) => void;
   onSelectAll: (select: boolean) => void;
-  onConfirm: () => void;
   onClose: () => void;
 }
 
@@ -57,7 +56,6 @@ const SceneSelectionModal: React.FC<SceneSelectionModalProps> = ({
   selectedScenes,
   onSelectScene,
   onSelectAll,
-  onConfirm,
   onClose,
   onGenerateDescriptions,
   onRegenerateAudio,

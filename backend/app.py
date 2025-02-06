@@ -79,6 +79,342 @@ def get_audio_files(filename):
     except Exception as e:
         return Response(str(e), status=404)
 
+@app.route("/regenerate-audio", methods=["POST"])
+def regenerate_audio():
+    def generate():
+        try:
+            data = request.get_json()
+            scenes = data.get("scenes", [])
+            video_name = data.get("video_name")
+
+            if not scenes or not video_name:
+                yield json.dumps({"error": "Missing required data (scenes or video_name)"}) + "\n"
+                return
+
+            video_path = os.path.join(UPLOAD_FOLDER, video_name)
+            if not os.path.exists(video_path):
+                yield json.dumps({"error": "Video file not found"}) + "\n"
+                return
+
+            audio_files = []
+            total_scenes = len(scenes)
+
+            for index, scene in enumerate(scenes):
+                start = scene["start"]
+                end = scene["end"]
+                description = scene.get("description", "")
+
+                # Generate audio for the description
+                unique_id = str(uuid.uuid4())
+                audio_file_path = convert_text_to_speech(description, AUDIO_FOLDER, f"audio_description_{unique_id}")
+
+                audio_file_path = audio_file_path.strip()[2:]  # Clean up the path
+
+                audio_files.append({
+                    "start": start,
+                    "end": end,
+                    "audio_file": audio_file_path
+                })
+
+                # Yield progress update
+                progress = int(((index + 1) / total_scenes) * 100)
+                yield json.dumps({
+                    "progress": progress,
+                    "message": f"Generated audio for scene {index + 1}/{total_scenes}",
+                    "audio_files": audio_files
+                }) + "\n"
+
+            # Final completion message
+            yield json.dumps({
+                "progress": 100,
+                "message": "Audio regeneration complete",
+                "audio_files": audio_files
+            }) + "\n"
+
+        except Exception as e:
+            error_msg = f"Failed to regenerate audio: {str(e)}"
+            print(f"Error: {error_msg}")
+            yield json.dumps({"error": error_msg}) + "\n"
+
+    return Response(stream_with_context(generate()), mimetype="application/x-ndjson")
+
+@app.route("/regenerate-descriptions", methods=["POST"])
+def regenerate_descriptions():
+    def generate():
+        try:
+            # Initial setup and validation
+            data = request.get_json()
+            scenes = data.get("scenes", [])
+            video_name = data.get("video_name")
+            
+            yield json.dumps({
+                "progress": 10,
+                "message": "Validating input..."
+            }) + "\n"
+
+            if not scenes or not video_name:
+                yield json.dumps({
+                    "error": "Missing required data (scenes or video_name)",
+                    "progress": -1
+                }) + "\n"
+                return
+
+            video_path = os.path.join(UPLOAD_FOLDER, video_name)
+            if not os.path.exists(video_path):
+                yield json.dumps({
+                    "error": "Video file not found",
+                    "progress": -1
+                }) + "\n"
+                return
+
+            # Generate video summary using existing function
+            yield json.dumps({
+                "progress": 20,
+                "message": "Analyzing video content..."
+            }) + "\n"
+            video_summary = rg.get_video_summary_with_gemini(video_path)
+
+            # Cut scenes from video using existing function
+            yield json.dumps({
+                "progress": 30,
+                "message": "Extracting video segments..."
+            }) + "\n"
+
+            # Create segments in required format for cut_video_by_no_talking
+            segments = [{
+                "start": scene["start"],
+                "end": scene["end"],
+                "type": "NO_TALKING"
+            } for scene in scenes]
+
+            # Use existing function to cut video
+            scene_numbers, scene_ids = rg.cut_video_by_no_talking(
+                video_path, segments, SCENES_FOLDER
+            )
+
+            # Generate descriptions using existing function
+            yield json.dumps({
+                "progress": 40,
+                "message": "Generating new descriptions..."
+            }) + "\n"
+
+            descriptions = rg.describe_existing_segments(
+                SCENES_FOLDER, (scene_numbers, scene_ids), AUDIO_FOLDER, video_summary
+            )
+
+            # Format response using existing function
+            yield json.dumps({
+                "progress": 90,
+                "message": "Finalizing results..."
+            }) + "\n"
+
+            response_data = rg.format_response_data(segments, descriptions)
+
+            # Clean up temporary scene files
+            for scene_id in scene_ids:
+                scene_file = os.path.join(SCENES_FOLDER, f"scene_{scene_id}.mp4")
+                if os.path.exists(scene_file):
+                    os.remove(scene_file)
+
+            yield json.dumps({
+                "progress": 100,
+                "data": response_data,
+                "message": "Regeneration complete"
+            }) + "\n"
+
+        except Exception as e:
+            error_msg = f"Regeneration failed: {str(e)}"
+            print(f"Error: {error_msg}\n{traceback.format_exc()}")
+            yield json.dumps({
+                "error": error_msg,
+                "progress": -1
+            }) + "\n"
+
+    return Response(stream_with_context(generate()), mimetype="application/x-ndjson")
+
+
+# @app.route("/regenerate-descriptions", methods=["POST"])
+# def regenerate_descriptions():
+#     def generate():
+#         try:
+#             # Initial setup and validation
+#             data = request.get_json()
+#             scenes = data.get("scenes", [])
+#             video_name = data.get("video_name")
+            
+#             yield json.dumps({
+#                 "progress": 10,
+#                 "message": "Validating input..."
+#             }) + "\n"
+
+#             if not scenes or not video_name:
+#                 yield json.dumps({
+#                     "error": "Missing required data (scenes or video_name)",
+#                     "progress": -1
+#                 }) + "\n"
+#                 return
+
+#             video_path = os.path.join(UPLOAD_FOLDER, video_name)
+#             if not os.path.exists(video_path):
+#                 yield json.dumps({
+#                     "error": "Video file not found",
+#                     "progress": -1
+#                 }) + "\n"
+#                 return
+
+#             # Generate video summary using existing function
+#             yield json.dumps({
+#                 "progress": 20,
+#                 "message": "Analyzing video content..."
+#             }) + "\n"
+#             video_summary = rg.get_video_summary_with_gemini(video_path)
+
+#             # Cut scenes from video using existing function
+#             yield json.dumps({
+#                 "progress": 30,
+#                 "message": "Extracting video segments..."
+#             }) + "\n"
+
+#             # Create segments in required format for cut_video_by_no_talking
+#             segments = [{
+#                 "start": scene["start"],
+#                 "end": scene["end"],
+#                 "type": "NO_TALKING"
+#             } for scene in scenes]
+
+#             # Use existing function to cut video
+#             scene_numbers, scene_ids = rg.cut_video_by_no_talking(
+#                 video_path, segments, SCENES_FOLDER
+#             )
+
+#             # Generate descriptions using existing function
+#             yield json.dumps({
+#                 "progress": 40,
+#                 "message": "Generating new descriptions..."
+#             }) + "\n"
+
+#             descriptions = rg.describe_existing_segments(
+#                 SCENES_FOLDER, (scene_numbers, scene_ids), AUDIO_FOLDER, video_summary
+#             )
+
+#             # Format response using existing function
+#             yield json.dumps({
+#                 "progress": 90,
+#                 "message": "Finalizing results..."
+#             }) + "\n"
+
+#             response_data = rg.format_response_data(segments, descriptions)
+
+#             # Clean up temporary scene files
+#             for scene_id in scene_ids:
+#                 scene_file = os.path.join(SCENES_FOLDER, f"scene_{scene_id}.mp4")
+#                 if os.path.exists(scene_file):
+#                     os.remove(scene_file)
+
+#             yield json.dumps({
+#                 "progress": 100,
+#                 "data": response_data,
+#                 "message": "Regeneration complete"
+#             }) + "\n"
+
+#         except Exception as e:
+#             error_msg = f"Regeneration failed: {str(e)}"
+#             print(f"Error: {error_msg}\n{traceback.format_exc()}")
+#             yield json.dumps({
+#                 "error": error_msg,
+#                 "progress": -1
+#             }) + "\n"
+
+#     return Response(stream_with_context(generate()), mimetype="application/x-ndjson")
+
+# @app.route("/regenerate-descriptions", methods=["POST"])
+# def regenerate_descriptions():
+#     try:
+#         data = request.get_json()
+#         scenes = data.get("scenes", [])
+#         video_name = data.get("video_name")
+#         print(f"Video name: {video_name}")
+#         print(f"Scenes: {scenes}")
+
+#         if not scenes or not video_name:
+#             return jsonify({"error": "Missing required data (scenes or video_name)"}), 400
+
+#         # Load the video
+#         video_path = os.path.join(UPLOAD_FOLDER, video_name)
+#         if not os.path.exists(video_path):
+#             return jsonify({"error": "Video file not found"}), 404
+
+#         # Generate video summary
+#         video_summary = rg.get_video_summary_with_gemini(video_path)
+
+#         # Process each selected scene
+#         new_descriptions = []
+#         for scene in scenes:
+#             start = scene["start"]
+#             end = scene["end"]
+#             current_description = scene.get("current_description", "")
+
+#             # Cut the specific scene from the video
+#             scene_filename = f"scene_{start}_{end}.mp4"
+#             scene_path = os.path.join(SCENES_FOLDER, scene_filename)
+#             subprocess.run([
+#                 "ffmpeg", "-y",
+#                 "-i", video_path,
+#                 "-ss", str(start / 1000),  # Convert ms to seconds
+#                 "-to", str(end / 1000),
+#                 "-c", "copy",
+#                 scene_path
+#             ], check=True)
+
+#             # Generate a new description for the scene
+#             new_description = rg.describe_scene_with_gemini(scene_path, video_summary)
+#             audio_file_path = convert_text_to_speech(new_description, AUDIO_FOLDER, f"audio_description_{uuid.uuid4()}")
+#             new_descriptions.append({
+#                 "start": start,
+#                 "end": end,
+#                 "description": new_description,
+#                 "audio_file": audio_file_path.strip()[2:]  # Clean up the path
+#             })
+
+#         return jsonify({"descriptions": new_descriptions}), 200
+
+#     except Exception as e:
+#         print("Error regenerating descriptions:", traceback.format_exc())
+#         return jsonify({"error": f"Failed to regenerate descriptions: {str(e)}"}), 500
+
+@app.route("/text-to-speech", methods=["POST"])
+def text_to_speech():
+    try:
+        data = request.get_json()
+        if not data or not isinstance(data, list):
+            return jsonify({"error": "Descriptions must be provided as a list."}), 400
+
+        audio_files = []
+        for item in data:
+            description = item.get("description")
+            timestamps = item.get("timestamps")
+            scene_id = item.get("scene_id")
+
+            if not description or not timestamps or not scene_id:
+                return jsonify({"error": "Each item must have description, timestamps, and scene_id."}), 400
+
+            # Generate audio for the description
+            unique_id = str(uuid.uuid4())
+            audio_file_path = convert_text_to_speech(description, AUDIO_FOLDER, f"audio_description_{unique_id}")
+
+            audio_file_path = audio_file_path.strip()[2:]  # Clean up the path
+
+            audio_files.append({
+                "timestamps": timestamps,
+                "description": description,
+                "audio_file": audio_file_path
+            })
+
+        return jsonify({"audio_files": audio_files}), 200
+
+    except Exception as e:
+        print("Error generating audio:", traceback.format_exc())
+        return jsonify({"error": f"Failed to generate audio: {str(e)}"}), 500
 
 
 # Update timestamp processing in analyze-timestamps route
@@ -162,7 +498,110 @@ def analyze_timestamps():
         print("An error occurred:", traceback.format_exc())
         return jsonify({"error": f"Processing error: {str(e)}"}), 500
 
-# Update encode-video-with-subtitles route
+# # Update encode-video-with-subtitles route
+# @app.route("/encode-video-with-subtitles", methods=["POST"])
+# def encode_video_with_subtitles():
+#     try:
+#         data = request.get_json()
+#         # Validate required fields
+#         required_fields = ['descriptions', 'timestamps', 'audioFiles', 'videoFileName']
+#         for field in required_fields:
+#             if field not in data or not data[field]:
+#                 return jsonify({"error": f"Missing {field}"}), 400
+
+#         # Process segments with millisecond timestamps
+#         filtered_segments = []
+#         audio_index = 0
+#         for i, (desc, (start, end)) in enumerate(zip(data['descriptions'], data['timestamps'])):
+#             if desc.strip().upper() != "TALKING":
+#                 audio_file = data['audioFiles'][audio_index]
+#                 audio_index += 1
+                
+#                 filtered_segments.append({
+#                     "start": start,
+#                     "end": end,
+#                     "audio": audio_file,
+#                     "description": desc
+#                 })
+
+#         # Generate SRT from milliseconds
+#         srt_content = []
+#         for i, seg in enumerate(filtered_segments, 1):
+#             start_srt = milliseconds_to_srt_time(seg["start"])
+#             end_srt = milliseconds_to_srt_time(seg["end"])
+#             srt_content.append(f"{i}\n{start_srt} --> {end_srt}\n{seg['description']}\n")
+        
+#         # Audio processing with millisecond precision
+#         audio_clips = []
+#         start_times = []
+#         for seg in filtered_segments:
+#             # Handle audio duration matching
+#             duration_ms = seg["end"] - seg["start"]
+#             original_duration = get_audio_duration(seg["audio"]) * 1000
+            
+#             if original_duration > duration_ms:
+#                 speed_factor = original_duration / duration_ms
+#                 with tempfile.NamedTemporaryFile(suffix=".mp3", delete=False) as f:
+#                     temp_path = f.name
+#                 speed_up_audio(seg["audio"], speed_factor, temp_path)
+#                 audio_clips.append(temp_path)
+#             else:
+#                 audio_clips.append(seg["audio"])
+            
+#             start_times.append(seg["start"] / 1000)  # Convert ms to seconds
+
+#         # Generate output video
+#         output_filename = f"processed_{data['videoFileName']}"
+#         output_path = os.path.join(PROCESSED_FOLDER, output_filename)
+        
+#         # FFmpeg command using millisecond timestamps
+#         subprocess.run([
+#             "ffmpeg", "-y",
+#             "-i", os.path.join(UPLOAD_FOLDER, data['videoFileName']),
+#             "-i", _create_mixed_audio(audio_clips, start_times),
+#             "-vf", f"subtitles={self._create_temp_file(srt_content)}",
+#             "-c:v", "libx264", "-c:a", "aac",
+#             output_path
+#         ], check=True)
+
+#         return send_file(output_path, mimetype='video/mp4')
+
+#     except Exception as e:
+#         return jsonify({"error": str(e)}), 500
+
+# # Helper functions with millisecond handling
+# def _create_mixed_audio(self, audio_files, start_times):
+#     """Mix audio clips at specific millisecond start times"""
+#     inputs = []
+#     filter_chains = []
+    
+#     for i, (file, start) in enumerate(zip(audio_files, start_times)):
+#         inputs.extend(["-i", file])
+#         filter_chains.append(
+#             f"[{i}:a]adelay={int(start*1000)}|{int(start*1000)}[a{i}];"
+#         )
+    
+#     filter_complex = "".join(filter_chains)
+#     filter_complex += f"{''.join([f'[a{i}]' for i in range(len(audio_files))])}amix=inputs={len(audio_files)}[aout]"
+    
+#     output = os.path.join(tempfile.gettempdir(), "mixed_audio.mp3")
+#     subprocess.run([
+#         "ffmpeg", "-y",
+#         *inputs,
+#         "-filter_complex", filter_complex,
+#         "-map", "[aout]",
+#         output
+#     ], check=True)
+#     return output
+
+# def milliseconds_to_srt_time(ms):
+#     """Convert milliseconds to SRT format (HH:MM:SS,mmm)"""
+#     hours, ms = divmod(ms, 3600000)
+#     minutes, ms = divmod(ms, 60000)
+#     seconds, ms = divmod(ms, 1000)
+#     return f"{hours:02d}:{minutes:02d}:{seconds:02d},{ms:03d}"
+
+
 @app.route("/encode-video-with-subtitles", methods=["POST"])
 def encode_video_with_subtitles():
     try:
@@ -218,13 +657,23 @@ def encode_video_with_subtitles():
         output_filename = f"processed_{data['videoFileName']}"
         output_path = os.path.join(PROCESSED_FOLDER, output_filename)
         
-        # FFmpeg command using millisecond timestamps
+        # Create mixed audio and subtitle files
+        mixed_audio_path = _create_mixed_audio(audio_clips, start_times)
+        srt_file_path = _create_temp_file(srt_content)
+
+        # FFmpeg command to include original audio and mixed audio as separate tracks
         subprocess.run([
             "ffmpeg", "-y",
-            "-i", os.path.join(UPLOAD_FOLDER, data['videoFileName']),
-            "-i", _create_mixed_audio(audio_clips, start_times),
-            "-vf", f"subtitles={self._create_temp_file(srt_content)}",
-            "-c:v", "libx264", "-c:a", "aac",
+            "-i", os.path.join(UPLOAD_FOLDER, data['videoFileName']),  # Original video
+            "-i", mixed_audio_path,  # Mixed audio
+            "-i", srt_file_path,  # Subtitles
+            "-map", "0:v:0",  # Video from the first input
+            "-map", "0:a:0",  # Original audio from the first input
+            "-map", "1:a:0",  # Mixed audio from the second input
+            "-map", "2:s:0",  # Subtitles from the third input
+            "-c:v", "libx264", 
+            "-c:a", "aac",
+            "-c:s", "mov_text",  # Use mov_text for subtitles in MP4
             output_path
         ], check=True)
 
@@ -233,8 +682,7 @@ def encode_video_with_subtitles():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-# Helper functions with millisecond handling
-def _create_mixed_audio(self, audio_files, start_times):
+def _create_mixed_audio(audio_files, start_times):
     """Mix audio clips at specific millisecond start times"""
     inputs = []
     filter_chains = []
@@ -265,7 +713,32 @@ def milliseconds_to_srt_time(ms):
     seconds, ms = divmod(ms, 1000)
     return f"{hours:02d}:{minutes:02d}:{seconds:02d},{ms:03d}"
 
-  
+def get_audio_duration(audio_file):
+    """Get the duration of an audio file in seconds"""
+    result = subprocess.run(
+        ["ffprobe", "-v", "error", "-show_entries", "format=duration",
+         "-of", "default=noprint_wrappers=1:nokey=1", audio_file],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE
+    )
+    return float(result.stdout)
+
+def speed_up_audio(audio_file, speed_factor, output_file):
+    """Speed up audio by a given factor"""
+    subprocess.run([
+        "ffmpeg", "-y", "-i", audio_file,
+        "-filter:a", f"atempo={speed_factor}",
+        output_file
+    ], check=True)
+
+def _create_temp_file(srt_content):
+    """Create a temporary file for SRT content"""
+    srt_file = tempfile.NamedTemporaryFile(suffix=".srt", delete=False)
+    with open(srt_file.name, 'w') as f:
+        f.writelines(srt_content)
+    return srt_file.name
+
+
 # @app.route("/process-video", methods=["POST"])
 # def process_video():
 #     print("Working")
@@ -505,8 +978,8 @@ def combine_audio_with_delays(audio_files, seconds_list, output_file):
     ], check=True)
 
 
-@app.route("/text-to-speech", methods=["POST"])
-def text_to_speech():
+# @app.route("/text-to-speech", methods=["POST"])
+# def text_to_speech():
     # Get the JSON data directly from the request
     data = request.get_json()
 

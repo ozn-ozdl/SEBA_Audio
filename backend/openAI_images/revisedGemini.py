@@ -18,6 +18,9 @@ import subprocess
 import os
 import concurrent.futures
 
+import time
+import random
+
 # Millisecond conversion functions
 def time_to_milliseconds(time_str):
     """Convert HH:MM:SS.sss format to milliseconds"""
@@ -106,48 +109,7 @@ def cut_video_by_no_talking(input_video_path, segments, output_folder):
 
     return (scene_numbers, scene_ids)
 
-import time
-import random
 
-# def generate_video_description_with_gemini(video_file_path, video_summary, max_retries=5, initial_delay=1):
-#     for attempt in range(max_retries):
-#         try:
-#             # Get scene duration
-#             duration_seconds = get_video_duration(video_file_path)
-#             word_limit = int((duration_seconds * 170) / 60)  # 170 WPM conversion
-            
-#             video_file = genai.upload_file(path=video_file_path)
-#             while video_file.state.name == "PROCESSING":
-#                 time.sleep(1)
-#                 video_file = genai.get_file(video_file.name)
-
-#             prompt = f'''
-#             **Video Context Summary**: {video_summary}
-
-#             Create an audio description for this video scene following these rules:
-#             1. Strictly use {word_limit} words maximum (scene length: {duration_seconds:.1f}s)
-#             2. Describe only visually apparent elements
-#             3. Use active voice and present tense
-#             4. Prioritize in this order:
-#                - Character actions/interactions
-#                - Significant object movements
-#                - Environmental changes
-#                - Emotional expressions
-#             5. Exclude obvious sounds covered by existing audio
-#             6. Maintain chronological order of events
-
-#             Return only the description text with no formatting or labels.
-#             '''
-
-#             model = genai.GenerativeModel(model_name="gemini-1.5-flash")
-#             response = model.generate_content([video_file, prompt],
-#                                               request_options={"timeout": 600})
-#             return response.text.strip('"')
-#         except Exception as e:
-#             if attempt == max_retries - 1:
-#                 raise
-#             delay = initial_delay * (2 ** attempt) + random.uniform(0, 1)
-#             time.sleep(delay)
             
 def generate_video_description_with_gemini(video_file_path, video_summary, max_retries=5, initial_delay=1):
     for attempt in range(max_retries):
@@ -179,9 +141,16 @@ def generate_video_description_with_gemini(video_file_path, video_summary, max_r
 
             Provide only the plain text description without any formatting.
             '''
-
+            prompt2 = f'''
+            You are an assistant that creates natural, clear, and concise audio descriptions for a given video scene for visually impaired individuals.
+            Describe the visual content of the whole given video scene in exactly one single sentence with no more than {word_limit} words.
+            Focus on key actions, objects, and emotions.
+            Ensure the sentence sounds natural when spoken aloud and provides essential information.
+            Only return the sentence without any additional information or text.
+            '''
+            print("Word limit:", word_limit)
             model = genai.GenerativeModel(model_name="gemini-1.5-flash")
-            response = model.generate_content([video_file, prompt],
+            response = model.generate_content([video_file, prompt2],
                                               request_options={"timeout": 600})
             return response.text.strip('"')
         except Exception as e:
@@ -334,6 +303,6 @@ def get_video_scenes_with_gemini(video_file_path):
     '''
 
     model = genai.GenerativeModel(model_name="gemini-1.5-flash")
-    response = model.generate_content([video_file, prompt2],
+    response = model.generate_content([video_file, prompt],
                                       request_options={"timeout": 600})
     return response.text

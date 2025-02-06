@@ -73,6 +73,7 @@ export const TranscriptionEditor: React.FC<VideoTimelineProps> = ({
   videoDescriptions,
   onDescriptionChange,
   uploadedVideo,
+  setUploadedVideo,
   handleEncodeVideo,
   handleRegenerateAudio,
   handleReanalyzeVideo,
@@ -161,6 +162,7 @@ export const TranscriptionEditor: React.FC<VideoTimelineProps> = ({
         videoUrl: URL.createObjectURL(file),
         videoFile: file,
       });
+      setUploadedVideo(file);
     }
   };
 
@@ -175,13 +177,10 @@ export const TranscriptionEditor: React.FC<VideoTimelineProps> = ({
   };
 
   const handleModalConfirm = async () => {
-    const scenesToReanalyze = Array.from(state.selectedScenes);
+    const scenesToReanalyze = Array.from(selectedScenes);
     await handleReanalyzeVideo(scenesToReanalyze);
     updateState({ isModalOpen: false });
   };
-  function onReanalyze(): void {
-    throw new Error("Function not implemented.");
-  }
 
   return (
     <div className="max-w-full overflow-hidden bg-gray-700/70 backdrop-blur-sm h-screen flex flex-col">
@@ -193,23 +192,15 @@ export const TranscriptionEditor: React.FC<VideoTimelineProps> = ({
       )}
 
       <SceneSelectionModal
-        isOpen={state.isModalOpen}
+        isOpen={state.isModalOpen && !isProcessing}
         scenes={videoDescriptions}
         selectedScenes={selectedScenes} // From props
         onSelectScene={onSelectScene} // From props
         onSelectAll={onSelectAll} // From props
-        onConfirm={onReanalyze} // From props
         onGenerateDescriptions={onGenerateDescriptions}
         onRegenerateAudio={onRegenerateAudio}
         onClose={() => updateState({ isModalOpen: false })}
       />
-
-      {/* <VideoHeader
-        onEncode={() => state.videoFile && handleEncodeVideo(state.videoFile)}
-        onAnalyze={analyzeVideo}
-        onReanalyze={() => updateState({ isModalOpen: true })}
-        onRegenerateAudio={handleRegenerateAudio}
-      /> */}
 
       <VideoHeader
         uploadedVideo={state.videoFile}
