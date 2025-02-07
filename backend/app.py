@@ -30,6 +30,7 @@ import openAI_images.revisedGemini as rg
 
 from uuid import uuid4
 
+
 app = Flask(__name__)
 app.config['MAX_CONTENT_LENGTH'] = 30 * 1024 * 1024
 CORS(app)
@@ -40,10 +41,12 @@ SCENES_FOLDER = "./scenes_results"
 PROCESSED_FOLDER = "./processed"
 AUDIO_FOLDER = "./audio"
 WAVEFORM_FOLDER = "./waveforms"
+TRIMMED_FOLDER = "./trimmed"
 
 # Ensure directories exist
 os.makedirs(PROCESSED_FOLDER, exist_ok=True)
 os.makedirs(AUDIO_FOLDER, exist_ok=True)
+os.makedirs(TRIMMED_FOLDER, exist_ok=True)
 
 def setup():
     os.makedirs(UPLOAD_FOLDER, exist_ok=True)
@@ -1013,47 +1016,122 @@ def combine_audio_with_delays(audio_files, seconds_list, output_file):
 
 # @app.route("/text-to-speech", methods=["POST"])
 # def text_to_speech():
-    # Get the JSON data directly from the request
-    data = request.get_json()
+#     # Get the JSON data directly from the request
+#     data = request.get_json()
+#     if not data or "text" not in data or "scene_name" not in data:
+#         return jsonify({"error": "Invalid input. 'text' and 'scene_name' are required."}), 400
 
-    if not data or not isinstance(data, list):
-        return jsonify({"error": "Descriptions must be provided as a list."}), 400
-    print("Data:", data)
-    try:
-        audio_files = []
-        for item in data:
-            print("Item:", item)
-            description = item.get("description")
-            timestamps = item.get("timestamps")
-            scene_id = item.get("scene_id")
-            unique_id = str(uuid.uuid4())
-            print("Description:", description)
-            print("Timestamps:", timestamps)
-            print("Scene ID:", scene_id)
-            # if not description or not timestamps or not scene_id:
-            #     return jsonify({"error": "Each item must have description, timestamps, and scene_id."}), 400
+#     text = data["text"]
+#     scene_name = data["scene_name"]
+#     sanitized_scene_name = re.sub(r"[<>:\"/\\|?*]", "-", scene_name)
+#     audio_file_name = f"{sanitized_scene_name}.mp3"
+#     audio_file_path = os.path.join(AUDIO_FOLDER, audio_file_name)
 
-            start_time, end_time = timestamps  # Unpack the timestamps
+#     if not data or not isinstance(data, list):
+#         return jsonify({"error": "Descriptions must be provided as a list."}), 400
+#     print("Data:", data)
+#     try:
+#         audio_files = []
+#         for item in data:
+#             print("Item:", item)
+#             description = item.get("description")
+#             timestamps = item.get("timestamps")
+#             scene_id = item.get("scene_id")
+#             unique_id = str(uuid.uuid4())
+#             print("Description:", description)
+#             print("Timestamps:", timestamps)
+#             print("Scene ID:", scene_id)
+#             # if not description or not timestamps or not scene_id:
+#             #     return jsonify({"error": "Each item must have description, timestamps, and scene_id."}), 400
 
-            # Use the provided function to convert text to speech for each description
-            audio_file_path = convert_text_to_speech(description, AUDIO_FOLDER, f"audio_description_{unique_id}")
+#             start_time, end_time = timestamps  # Unpack the timestamps
 
-            # Append the description, timestamps, and audio file path to the audio_files list
-            # from the audio file path, strip the leading and trailing whitespaces and the leading dot and slash
-            audio_file_path = audio_file_path.strip()
-            audio_file_path = audio_file_path[2:]
-            print(audio_file_path)
-            audio_files.append({
-                "timestamps": timestamps,
-                "description": description,
-                "audio_file": audio_file_path
-            })
+#             # Use the provided function to convert text to speech for each description
+#             audio_file_path = convert_text_to_speech(description, AUDIO_FOLDER, f"audio_description_{unique_id}")
 
-        # Return the generated audio files information in the response
-        return jsonify({"audio_files": audio_files}), 200
+#             # Append the description, timestamps, and audio file path to the audio_files list
+#             # from the audio file path, strip the leading and trailing whitespaces and the leading dot and slash
+#             audio_file_path = audio_file_path.strip()
+#             audio_file_path = audio_file_path[2:]
+#             print(audio_file_path)
+#             audio_files.append({
+#                 "timestamps": timestamps,
+#                 "description": description,
+#                 "audio_file": audio_file_path
+#             })
 
-    except Exception as e:
-        return jsonify({"error": f"Failed to process descriptions: {str(e)}"}), 500
+#         # Return the generated audio files information in the response
+#         return jsonify({"audio_files": audio_files}), 200
+#         if not os.path.exists(audio_file_path):
+#             tts = gTTS(text=text, lang="en")
+#             tts.save(audio_file_path)
+
+#         return send_file(audio_file_path, mimetype="audio/mpeg", as_attachment=False)
+#     except Exception as e:
+#         return jsonify({"error": str(e)}), 500
+
+# STANDARD_WPM = 150
+
+# def calculate_speed_adjustment(text, duration_in_seconds):
+#     word_count = len(text.split())
+#     expected_time = (word_count / STANDARD_WPM) * 60 
+#     speed_ratio = expected_time / duration_in_seconds
+#     return max(0.5, min(2.0, speed_ratio))
+
+# def parse_timestamp(timestamp):
+#     try:
+#         parts = list(map(int, timestamp.split(":")))
+#         if len(parts) != 3:
+#             raise ValueError("Timestamp must be in HH:MM:SS format")
+#         return parts
+#     except Exception as e:
+#         raise ValueError(f"Invalid timestamp format: {timestamp}")
+
+# @app.route("/text-to-speech-speed", methods=["POST"])
+# def text_to_speech_with_speed_adjustment():
+#     try:
+#         data = request.get_json()
+#         if not data or "text" not in data or "scene_name" not in data or "timestamps" not in data:
+#             return jsonify({"error": "Invalid input. 'text', 'scene_name', and 'timestamps' are required."}), 400
+
+#         text = data["text"]
+#         scene_name = data["scene_name"]
+#         timestamps = data["timestamps"]
+
+#         start_time = parse_timestamp(timestamps[0])
+#         end_time = parse_timestamp(timestamps[1])
+#         duration_in_seconds = (end_time[0] * 3600 + end_time[1] * 60 + end_time[2]) - (
+#             start_time[0] * 3600 + start_time[1] * 60 + start_time[2]
+#         )
+
+#         if duration_in_seconds <= 0:
+#             return jsonify({"error": "Invalid timestamps. Duration must be greater than 0."}), 400
+
+#         sanitized_scene_name = re.sub(r"[<>:\"/\\|?*]", "-", scene_name)
+#         audio_file_name = f"{sanitized_scene_name}.mp3"
+#         audio_file_path = os.path.join(TRIMMED_FOLDER, audio_file_name)
+#         speed = calculate_speed_adjustment(text, duration_in_seconds)
+#         print(f"Calculated speed: {speed:.2f}x for scene: {scene_name}")
+
+#         tts = gTTS(text=text, lang="en", slow=speed < 1.0)
+#         tts.save(audio_file_path)
+
+#     except Exception as e:
+#         return jsonify({"error": f"Failed to process descriptions: {str(e)}"}), 500
+#         print(f"Error: {e}")
+#         return jsonify({"error": str(e)}), 500
+
+
+def generate_srt_file(descriptions, timestamps):
+    """Generate SRT file content from descriptions and timestamps."""
+    srt_content = []
+    for i, (description, (start, end)) in enumerate(zip(descriptions, timestamps), start=1):
+        srt_content.append(f"{i}")
+        srt_content.append(f"{start} --> {end}")
+        srt_content.append(description)
+        srt_content.append("")
+    return "\n".join(srt_content)
+
 
 if __name__ == "__main__":
     app.run(debug=True)
