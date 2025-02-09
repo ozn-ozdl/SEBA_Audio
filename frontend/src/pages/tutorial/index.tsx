@@ -1,66 +1,75 @@
 import React from "react";
-import faqimg from './faq.png'
+import faqimg from './faq.png';
+import dashboardimg from './Dashboard_Create.png';
+import editorimg from './Editor.png';
+import saveimg from './Save_EncodeVideo.png';
+import uploadimg from './Upload_AnalyzeVideo.png';
 
 const TutorialPage: React.FC = () => {
   const steps = [
     {
-      title: "Step 1: Upload Your Video",
+      title: "Step 1: Create Project",
       description: (
         <p>
-          Go to the video upload section and choose the video you want to process.
+          When you click <strong>Get Started for Free</strong> on the home page, 
+          you'll be redirected to the <strong>Dashboard</strong>.
+          This is your central hub where you'll find the project overview.
+          <br />
+          <br />
+          You can enter a project name in the top right corner and click <strong>Create Project</strong>!
+          Once you've created a new project, 
+          you'll be shown the workspace page.
+        </p>
+      ),
+    },
+    {
+      title: "Step 2: Upload Your Video",
+      description: (
+        <p>
+          Go to the video upload section on the right and choose the video you want to process.
           Supported formats include MP4, AVI, and MOV.
         </p>
       ),
     },
     {
-      title: "Step 2: Choose an Analysis Method",
-      description: (
-        <>
-          <p>
-            Select one of the following analysis methods based on your needs:
-          </p>
-          <ul className="list-disc ml-6">
-            <li>
-              <strong>OpenAI with Images:</strong> Processes the video using
-              OpenAI and image analysis.
-            </li>
-            <li>
-              <strong>Gemini Only Video:</strong> Focuses solely on video
-              processing.
-            </li>
-            <li>
-              <strong>Gemini Optimized:</strong> Our recommended method,
-              providing the best results with enhanced analysis.
-            </li>
-          </ul>
-        </>
-      ),
-    },
-    {
-      title: "Step 3: View Results",
+      title: "Step 3: Analyze Your Video",
       description: (
         <p>
-          Depending on the method you choose and the size of the uploaded video,
-          you'll be delighted to see the timestamps and descriptions of what's
-          happening in the video in just a few minutes!
+          Shall we start analyzing your video using <strong>NarrifAI</strong>?
+          If yes, let's click the <strong>Analyze Video</strong> button on the top right!
         </p>
       ),
     },
     {
-      title: "Step 4: Listen to Descriptions",
+      title: "Step 4: View Results",
       description: (
         <p>
-          Use the "Play Audio" button to hear the descriptions of the video. You
-          can pause or stop the audio anytime.
+          Depending on the size of the uploaded video, you'll be delighted to see the timestamps 
+          and descriptions of what's happening in the video in just a few minutes!
         </p>
       ),
     },
     {
-      title: "Step 5: Download Finalized Video",
+      title: "Step 5: More Tools",
       description: (
         <p>
-          Click the "Finalize and Encode Video" button to download the video with
-          subtitles embedded.
+          Hit the Play icon to check if the generated descriptions match the actual content.
+          <br />
+          <br />
+          You can save your work whenever you want in the bottom right corner.
+          <br />
+          <br />
+          You can also use <strong>Regenerate</strong> and the other tools, such as adding new scenes, 
+          to make the work fit your needs.
+        </p>
+      ),
+    },
+    {
+      title: "Step 6: Download Encoded Video",
+      description: (
+        <p>
+          Click the <strong>Encode Video</strong> button to download the video with
+          subtitles embedded. Enjoy your time with it!
         </p>
       ),
     },
@@ -69,7 +78,7 @@ const TutorialPage: React.FC = () => {
   return (
     <div className="min-h-screen bg-gray-50 text-gray-900 flex flex-col">
       {/* Header */}
-      <header className="w-full py-6 px-8 flex justify-between items-center">
+      <header className="w-full py-6 px-8 flex justify-between items-center ">
         <h1 className="text-2xl font-bold text-gray-800">NarrifAI</h1>
       </header>
 
@@ -91,7 +100,7 @@ const TutorialPage: React.FC = () => {
           {/* Left: Steps */}
           <div className="space-y-8">
             {steps.map((step, index) => (
-              <div key={index} className="bg-white p-8 rounded-lg shadow-lg">
+              <div key={index} className="bg-white p-8 rounded-lg shadow-lg hover:shadow-xl transition-shadow">
                 <h2 className="text-2xl font-bold text-indigo-600 mb-4">
                   {step.title}
                 </h2>
@@ -106,17 +115,24 @@ const TutorialPage: React.FC = () => {
               Screenshots
             </h3>
             <div className="space-y-6">
-              <div className="bg-gray-100 h-64 rounded-lg flex items-center justify-center">
-                  <img src={faqimg} className="h-full object-cover w-full"/>
+            <div className="bg-gray-100 h-96 rounded-lg flex flex-col items-center justify-center p-4 hover:shadow-xl transition-shadow">
+                <img src={dashboardimg} className="h-full w-full object-contain" />
+                <p className="text-gray-700 mt-2 text-center">Step 1: Create Project</p>
               </div>
-              <div className="bg-gray-100 h-64 rounded-lg flex items-center justify-center">
-                <p className="text-gray-400">Screenshot Placeholder 2</p>
+
+              <div className="bg-gray-100 h-96 rounded-lg flex flex-col items-center justify-center p-4 hover:shadow-xl transition-shadow">
+                <img src={uploadimg} className="h-full object-contain" />
+                <p className="text-gray-700 mt-2 text-center">Step 2: Upload Your Video</p>
               </div>
-              <div className="bg-gray-100 h-64 rounded-lg flex items-center justify-center">
-                <p className="text-gray-400">Screenshot Placeholder 3</p>
+
+              <div className="bg-gray-100 h-96 rounded-lg flex flex-col items-center justify-center p-4 hover:shadow-xl transition-shadow">
+                <img src={editorimg} className="h-full w-full object-contain" />
+                <p className="text-gray-700 mt-2 text-center">Step 3-4: View & Edit Video</p>
               </div>
-              <div className="bg-gray-100 h-64 rounded-lg flex items-center justify-center">
-                <p className="text-gray-400">Screenshot Placeholder 4</p>
+
+              <div className="bg-gray-100 h-96 rounded-lg flex flex-col items-center justify-center p-4 hover:shadow-xl transition-shadow">
+                <img src={saveimg} className="h-full w-full object-contain" />
+                <p className="text-gray-700 mt-2 text-center">Step 5-6: Save & Export</p>
               </div>
             </div>
           </div>

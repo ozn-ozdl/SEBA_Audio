@@ -1,26 +1,30 @@
 import React from "react";
+import leonimg from './leon.jpg'
+import ozanimg from './ozan.jpg'
+import weijiaimg from './weijia.jpg'
+import yagmurimg from './yagmur.jpg'
 
 const TeamPage: React.FC = () => {
   const teamMembers = [
     {
       name: "Leon",
       role: "Fullstack Developer",
-      image: "/images/leon.jpg", // Replace with actual image path
+      image: leonimg, // 2. 使用导入的图片变量
     },
     {
       name: "Ozan",
       role: "Fullstack Developer",
-      image: "/images/ozan.jpg", // Replace with actual image path
+      image: ozanimg,
     },
     {
       name: "Weijia",
       role: "Fullstack Developer",
-      image: "/images/weijia.jpg", // Replace with actual image path
+      image: weijiaimg,
     },
     {
       name: "Yagmur",
       role: "Fullstack Developer",
-      image: "/images/yagmur.jpg", // Replace with actual image path
+      image: yagmurimg,
     },
   ];
 

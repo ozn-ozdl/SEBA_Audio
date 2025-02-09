@@ -73,7 +73,7 @@ export function SideBar() {
                       to="/faq"
                       className="flex justify-center items-center hover:bg-gray-700 p-2 rounded"
                     >
-                      FAQ
+                      FAQs
                     </Link>
                   </li>
                 </ul>

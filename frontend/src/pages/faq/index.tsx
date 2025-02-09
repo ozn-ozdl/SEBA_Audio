@@ -11,19 +11,59 @@ const FAQPage: React.FC = () => {
 
   const faqs = [
     {
-      question: "What do we do?",
+      question: "How does audio description work?",
       answer:
-        "NarrifAI processes videos to extract transcripts, create detailed descriptions, and turn them into audio.",
+        "Audio description leverages AI to analyze video content, identify key visual elements, and generate descriptive audio tracks. This ensures that visually impaired users can fully understand the context and narrative of a video.",
     },
     {
-      question: "How do I get started?",
+      question: "What technologies does NarrifAI use for video description?",
       answer:
-        "Upload your video, choose an analysis method, and view your results. You can then listen to audio descriptions.",
+        "NarrifAI uses advanced technologies like the scene detection framework and the Gemini processing engine for generating highly accurate and context-aware descriptions. Additionally, we integrate Google Text-to-Speech for high-quality audio output.",
     },
     {
-      question: "How does support work?",
+      question: "What is the European Accessibility Act?",
       answer:
-        "We offer 24/7 support to ensure your business runs smoothly at all times.",
+        "The European Accessibility Act is a directive that requires digital products and services to be accessible to all users, including those with disabilities. This includes providing features like audio descriptions, captions, and other accessibility tools for digital content.",
+    },
+    {
+      question: "What export options are available?",
+      answer:
+        "NarrifAI supports multiple export options, including MP3 for audio-only files, SRT for subtitles, and fully encoded videos with embedded audio descriptions and subtitles. These options ensure flexibility for various use cases.",
+    },
+    {
+      question: "What happens when there is speech in the video?",
+      answer:
+        "NarrifAI ensures a seamless listening experience by avoiding overlaps between speech and audio descriptions. Descriptions are only added during pauses or moments without talking, ensuring that the original dialogue remains clear and uninterrupted.",
+    },
+    {
+      question: "Can I preview the generated descriptions before exporting?",
+      answer:
+        "Yes! You can preview audio descriptions and transcripts within the platform. You also have the flexibility to manually adjust video descriptions and fine-tune timestamps to ensure the final result meets your expectations.",
+    },
+    {
+      question: "Is there a limit on the video length?",
+      answer:
+        "Currently, NarrifAI supports videos up to 10 minutes in length. For longer videos, we recommend splitting them into smaller parts for processing. We are actively working on optimizing the platform to support longer video inputs in the near future.",
+    },
+    {
+      question: "How accurate are the transcriptions and descriptions?",
+      answer:
+        "The accuracy of transcriptions and descriptions is highly reliable and depends on the AI model used. While the outputs are generally precise, users have the flexibility to review and adjust the results for complete customization and optimal quality.",
+    },
+    {
+      question: "Can I save my work?",
+      answer:
+        "Yes, NarrifAI provides a dashboard where all your previous work is saved directly in your browser. This allows you to revisit, review, and manage your projects anytime.",
+    },
+    {
+      question: "What types of videos work best with NarrifAI?",
+      answer:
+        "NarrifAI works exceptionally well with entertainment videos, especially those where scenes do not change rapidly. Videos with steady visuals and clear audio yield the best results, ensuring accurate and context-aware descriptions.",
+    },
+    {
+      question: "How long does it take to process a video?",
+      answer:
+        "Processing time depends on the video input, including factors like size, quality, and the number of scenes. Typically, it takes only a few minutes to process a video of under 10 minutes.",
     },
   ];
 
