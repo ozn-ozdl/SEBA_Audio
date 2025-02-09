@@ -21,13 +21,6 @@ import { ProcessingOverlay } from "./ProcessingOverlay";
 import { DescriptionsSidebar } from "./DescriptionSidebar";
 import { VideoDescriptionItem } from "src/types";
 
-// interface VideoDescriptionItem {
-//   startTime: number;
-//   endTime: number;
-//   description: string;
-//   audioFile?: string;
-// }
-
 interface VideoTimelineProps {
   videoDescriptions: VideoDescriptionItem[];
   onDescriptionChange: (updatedDescriptions: VideoDescriptionItem[]) => void;
@@ -48,20 +41,28 @@ interface VideoTimelineProps {
   processingMessage: string;
   onGenerateDescriptions: () => void;
   onRegenerateAudio: () => void;
+  videoFile: File | null;
 }
 
 const buttonStyles = {
-  base: "transition-all duration-150 font-medium rounded-lg text-sm px-4 py-2 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:pointer-events-none",
+  base:
+    "transition-all duration-150 font-medium rounded-lg text-sm px-4 py-2 " +
+    "focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 " +
+    "disabled:opacity-50 disabled:pointer-events-none",
   variants: {
     default:
-      "bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm hover:shadow-indigo-500/30",
+      "bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm " +
+      "hover:shadow-indigo-500/30",
     secondary:
-      "bg-gray-800 hover:bg-gray-700 text-gray-100 shadow-sm hover:shadow-gray-500/20",
+      "bg-gray-800 hover:bg-gray-700 text-gray-100 shadow-sm " +
+      "hover:shadow-gray-500/20",
     ghost: "hover:bg-gray-800/50 text-gray-300 hover:text-gray-100",
     outline:
-      "border border-gray-600 hover:border-gray-500 bg-gray-900/80 text-gray-300 hover:text-gray-100",
+      "border border-gray-600 hover:border-gray-500 bg-gray-900/80 " +
+      "text-gray-300 hover:text-gray-100",
     destructive:
-      "bg-red-600 hover:bg-red-700 text-white shadow-sm hover:shadow-red-500/30",
+      "bg-red-600 hover:bg-red-700 text-white shadow-sm " +
+      "hover:shadow-red-500/30",
   },
   sizes: {
     sm: "px-3 py-1.5 text-xs",
@@ -88,6 +89,7 @@ export const TranscriptionEditor: React.FC<VideoTimelineProps> = ({
   onGenerateDescriptions,
   onRegenerateAudio,
   setVideoName,
+  videoFile,
 }) => {
   const [state, setState] = useState({
     isPlaying: false,
@@ -101,7 +103,7 @@ export const TranscriptionEditor: React.FC<VideoTimelineProps> = ({
     selectedScenes: new Set<number>(),
     isDescriptionsVisible: true,
     isModalOpen: false,
-    videoFile: null as File | null,
+    videoFile,
   });
 
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -160,14 +162,20 @@ export const TranscriptionEditor: React.FC<VideoTimelineProps> = ({
   const handleVideoUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
-      updateState({
-        videoUrl: URL.createObjectURL(file),
-        videoFile: file,
-      });
       setUploadedVideo(file);
       setVideoName(file.name);
     }
   };
+
+  useEffect(() => {
+    if (videoFile) {
+      const url = URL.createObjectURL(videoFile);
+      updateState({
+        videoUrl: url,
+        videoFile: videoFile,
+      });
+    }
+  }, [videoFile]);
 
   const analyzeVideo = async () => {
     if (state.videoFile) {

@@ -1,5 +1,5 @@
-import React, { useEffect, useRef } from 'react';
-import { Upload } from 'lucide-react';
+import React, { useEffect, useRef } from "react";
+import { Upload } from "lucide-react";
 
 interface VideoPlayerProps {
   videoRef: React.RefObject<HTMLVideoElement>;
@@ -9,8 +9,8 @@ interface VideoPlayerProps {
   onLoadedMetadata: () => void;
   onUpload: (event: React.ChangeEvent<HTMLInputElement>) => void;
   isProcessing: boolean;
-  onTimeUpdate: (currentTime: number) => void; // New prop for time update
-  isPlaying: boolean; // New prop to track play state
+  onTimeUpdate: (currentTime: number) => void;
+  isPlaying: boolean;
 }
 
 export const VideoPlayer: React.FC<VideoPlayerProps> = ({
@@ -22,15 +22,16 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   onUpload,
   isProcessing,
   onTimeUpdate,
-  isPlaying, // Destructure new prop
+  isPlaying,
 }) => {
   const animationRef = useRef<number | null>(null);
+  const prevVideoUrl = useRef<string | null>(null); // Ref to store previous videoUrl
 
   useEffect(() => {
     if (isPlaying && videoRef.current) {
       const updateCurrentTime = () => {
         if (videoRef.current) {
-          onTimeUpdate(videoRef.current.currentTime); // Call the callback with current time
+          onTimeUpdate(videoRef.current.currentTime);
           animationRef.current = requestAnimationFrame(updateCurrentTime);
         }
       };
@@ -47,6 +48,21 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     };
   }, [isPlaying, onTimeUpdate, videoRef]);
 
+  useEffect(() => {
+    // Clean up the previous video URL
+    if (prevVideoUrl.current && prevVideoUrl.current !== videoUrl) {
+      URL.revokeObjectURL(prevVideoUrl.current);
+    }
+    prevVideoUrl.current = videoUrl;
+
+    return () => {
+      // Clean up when the component unmounts
+      if (prevVideoUrl.current) {
+        URL.revokeObjectURL(prevVideoUrl.current);
+      }
+    };
+  }, [videoUrl]);
+
   return (
     <div className="flex-1 relative">
       {videoFile ? (
@@ -57,6 +73,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
             src={videoUrl}
             onLoadedMetadata={onLoadedMetadata}
             controls={false}
+            key={videoUrl} // Add the key prop
           />
           <div className="absolute bottom-8 left-0 right-0 flex justify-center">
             <div className="bg-black bg-opacity-50 px-4 py-2 rounded-lg max-w-2xl text-center">

@@ -11,7 +11,7 @@ import reportWebVitals from "./reportWebVitals";
 import Workspace2 from "./pages/workspace/index2";
 import Workspace3 from "./pages/workspace/index3";
 import App from "./App";
-import Tutorial from './pages/tutorial/index';
+import Tutorial from "./pages/tutorial/index";
 import FAQ from "./pages/faq/index";
 import Team from "./pages/team/index";
 
@@ -36,6 +36,7 @@ root.render(
                   <Route path="faq" element={<FAQ />} />
                   <Route path="tutorial" element={<Tutorial />} />
                   <Route path="team" element={<Team />} />
+                  <Route path="app" element={<WorkSpace />} />
                 </Routes>
               </div>
             </div>

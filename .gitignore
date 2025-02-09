@@ -168,3 +168,4 @@ cython_debug/
 /backend/audio
 /backend/waveforms 
 /backend/scenes_results
+/backend/srt

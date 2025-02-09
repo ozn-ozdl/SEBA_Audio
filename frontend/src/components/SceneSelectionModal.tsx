@@ -17,7 +17,6 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "./ui/tooltip";
-import { on } from "events";
 
 interface SceneSelectionModalProps {
   isOpen: boolean;
@@ -31,17 +30,24 @@ interface SceneSelectionModalProps {
 }
 
 const buttonStyles = {
-  base: "transition-all duration-150 font-medium rounded-lg text-sm px-4 py-2 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:pointer-events-none",
+  base:
+    "transition-all duration-150 font-medium rounded-lg text-sm px-4 py-2 " +
+    "focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 " +
+    "disabled:opacity-50 disabled:pointer-events-none",
   variants: {
     default:
-      "bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm hover:shadow-indigo-500/30",
+      "bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm " +
+      "hover:shadow-indigo-500/30",
     secondary:
-      "bg-gray-800 hover:bg-gray-700 text-gray-100 shadow-sm hover:shadow-gray-500/20",
+      "bg-gray-800 hover:bg-gray-700 text-gray-100 shadow-sm " +
+      "hover:shadow-gray-500/20",
     ghost: "hover:bg-gray-800/50 text-gray-300 hover:text-gray-100",
     outline:
-      "border border-gray-600 hover:border-gray-500 bg-gray-900/80 text-gray-300 hover:text-gray-100",
+      "border border-gray-600 hover:border-gray-500 bg-gray-900/80 " +
+      "text-gray-300 hover:text-gray-100",
     destructive:
-      "bg-red-600 hover:bg-red-700 text-white shadow-sm hover:shadow-red-500/30",
+      "bg-red-600 hover:bg-red-700 text-white shadow-sm " +
+      "hover:shadow-red-500/30",
   },
   sizes: {
     sm: "px-3 py-1.5 text-xs",
@@ -64,7 +70,7 @@ const SceneSelectionModal: React.FC<SceneSelectionModalProps> = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="bg-gray-900 p-8 rounded-xl shadow-2xl max-w-md w-full border border-gray-700">
+      <DialogContent className="bg-gray-900 p-8 rounded-xl shadow-2xl max-w-2xl w-full border border-gray-700">
         <DialogHeader>
           <DialogTitle className="text-xl font-bold text-gray-100">
             Select Scenes to Reanalyze
@@ -97,7 +103,7 @@ const SceneSelectionModal: React.FC<SceneSelectionModalProps> = ({
                       id={`scene-${scene.startTime}`}
                       checked={selectedScenes.has(scene.startTime)}
                       onCheckedChange={() => onSelectScene(scene.startTime)}
-                      className="h-5 w-5 text-indigo-400 border-gray-500 data-[state=checked]:border-indigo-400 mt-1"
+                      className="h-5 w-5 text-white border-gray-500 data-[state=checked]:bg-indigo-400 mt-1"
                     />
                     <div className="flex-1 min-w-0">
                       <div className="flex items-baseline space-x-2">
