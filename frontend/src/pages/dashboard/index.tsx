@@ -1,6 +1,6 @@
 import { Button } from "src/components/ui/button";
 import { useNavigate } from "react-router-dom";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useLocalStorage } from "@uidotdev/usehooks";
 import {
   Table,
@@ -11,7 +11,8 @@ import {
   TableRow,
 } from "../../components/ui/table";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faTrash, faFolderOpen } from "@fortawesome/free-solid-svg-icons";
+import { faTrash, faFolderOpen, faSignOutAlt } from "@fortawesome/free-solid-svg-icons";
+
 
 interface VideoDescriptionItem {
   startTime: number;
@@ -32,9 +33,16 @@ interface ProjectData {
 export function Dashboard() {
   const navigate = useNavigate();
   const [projectName, setProjectName] = useState("");
+  const loggedInUser = JSON.parse(localStorage.getItem("loggedInUser") || "{}");
+  const [userName, setUserName] = useState(loggedInUser.name || "User");
 
   const [videoDescriptionsStorage, setVideoDescriptionsStorage] =
     useLocalStorage<ProjectData[]>("video_descriptions", []);
+    
+  const handleLogout = () => {
+    localStorage.removeItem("loggedInUser");
+    navigate("/");
+  };
 
   const handleCreateProject = (): void => {
     if (!projectName.trim()) {
@@ -60,7 +68,7 @@ export function Dashboard() {
   return (
     <div className="p-6">
       <header className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold text-gray-700">Dashboard</h1>
+        <h1 className="text-2xl font-bold text-gray-700">Dashboard of {userName} </h1>
         <div className="flex space-x-4">
           <input
             type="text"
@@ -75,6 +83,15 @@ export function Dashboard() {
           >
             Create Project
           </Button>
+
+          <Button
+            className="bg-red-500 text-white hover:bg-red-600 flex items-center space-x-2"
+            onClick={handleLogout}
+          >
+            <FontAwesomeIcon icon={faSignOutAlt} />
+            <span>Logout</span>
+          </Button>
+
         </div>
       </header>
 

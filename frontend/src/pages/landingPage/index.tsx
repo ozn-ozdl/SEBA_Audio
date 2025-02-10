@@ -82,7 +82,7 @@ const LandingPage: React.FC = () => {
         </p>
         <Button
           className="mt-8 px-8 py-4 bg-indigo-600 text-white text-lg rounded-full shadow-md hover:bg-indigo-500 transition"
-          onClick={() => (window.location.href = "/dashboard")}
+          onClick={() => (window.location.href = "/login")}
         >
           Get Started for Free
         </Button>
