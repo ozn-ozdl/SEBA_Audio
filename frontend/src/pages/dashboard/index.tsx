@@ -14,10 +14,19 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faTrash, faFolderOpen } from "@fortawesome/free-solid-svg-icons";
 
 interface VideoDescriptionItem {
-  startTime: string;
-  endTime: string;
+  startTime: number;
+  endTime: number;
   description: string;
-  videoUrl: string;
+  audioFile?: string;
+  isEdited: boolean; // New flag
+}
+
+interface ProjectData {
+  name: string;
+  data: VideoDescriptionItem[];
+  date: string;
+  videoName: string;
+  screenshot?: string;
 }
 
 export function Dashboard() {
@@ -25,9 +34,7 @@ export function Dashboard() {
   const [projectName, setProjectName] = useState("");
 
   const [videoDescriptionsStorage, setVideoDescriptionsStorage] =
-    useLocalStorage<
-      { name: string; data: VideoDescriptionItem[]; date: string }[]
-    >("video_descriptions", []);
+    useLocalStorage<ProjectData[]>("video_descriptions", []);
 
   const handleCreateProject = (): void => {
     if (!projectName.trim()) {
@@ -35,10 +42,12 @@ export function Dashboard() {
       return;
     }
     navigate(`/workspace?name=${projectName}`);
+    console.log("Projec name", projectName);
   };
 
-  const handleProjectClick = (projectName: string): void => {
-    navigate(`/workspace?name=${projectName}`);
+  const handleProjectClick = (project: ProjectData): void => {
+    navigate(`/workspace?name=${encodeURIComponent(project.name)}`);
+    console.log("Project name", project.name);
   };
 
   const handleDeleteProject = (projectName: string): void => {
@@ -75,6 +84,7 @@ export function Dashboard() {
             <TableRow>
               <TableHead className="p-2 text-gray-600">Project Name</TableHead>
               <TableHead className="p-2 text-gray-600">Last Updated</TableHead>
+              <TableHead className="p-2 text-gray-600">Screenshot</TableHead>
               <TableHead className="p-2 text-gray-600">Actions</TableHead>
             </TableRow>
           </TableHeader>
@@ -94,11 +104,20 @@ export function Dashboard() {
                     {item.date}
                   </TableCell>
                   <TableCell className="p-2">
+                    {item.screenshot && (
+                      <img
+                        src={item.screenshot}
+                        alt="Project Screenshot"
+                        className="w-20 h-12 object-cover rounded"
+                      />
+                    )}
+                  </TableCell>
+                  <TableCell className="p-2">
                     <div className="flex space-x-2">
                       <Button
                         variant="link"
                         className="text-blue-500 hover:underline"
-                        onClick={() => handleProjectClick(item.name)}
+                        onClick={() => handleProjectClick(item)}
                       >
                         <FontAwesomeIcon icon={faFolderOpen} /> Open
                       </Button>
@@ -115,7 +134,7 @@ export function Dashboard() {
               ))
             ) : (
               <TableRow>
-                <TableCell colSpan={3} className="text-center text-gray-500">
+                <TableCell colSpan={4} className="text-center text-gray-500">
                   No projects available.
                 </TableCell>
               </TableRow>

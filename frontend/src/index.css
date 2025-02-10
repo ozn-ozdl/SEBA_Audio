@@ -44,6 +44,24 @@ code {
     --sidebar-border: 240 3.7% 15.9%;
     --sidebar-ring: 217.2 91.2% 59.8%;
   }
+    /* Custom Scrollbar Styles */
+    ::-webkit-scrollbar {
+      width: 8px; /* Width of the scrollbar */
+    }
+  
+    ::-webkit-scrollbar-track {
+      background: rgba(255, 255, 255, 0.1); /* Background of the scrollbar track */
+      border-radius: 10px; /* Rounded corners for the track */
+    }
+  
+    ::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.3); /* Color of the scrollbar thumb */
+      border-radius: 10px; /* Rounded corners for the thumb */
+    }
+  
+    ::-webkit-scrollbar-thumb:hover {
+      background: rgba(255, 255, 255, 0.5); /* Color of the thumb on hover */
+    }
 }
 
 @layer base {

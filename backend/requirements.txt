@@ -1,10 +1,11 @@
 flask-cors
 flask
 opencv-python
-scikit-image
 python-dotenv
 openai
 scenedetect
 google-cloud-aiplatform
 google-auth
 google-generativeai
+gtts
+scikit-image

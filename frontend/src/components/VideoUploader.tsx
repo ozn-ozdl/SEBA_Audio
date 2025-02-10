@@ -7,8 +7,8 @@ interface VideoUploaderProps {
 const VideoUploader: React.FC<VideoUploaderProps> = ({ onProcessVideo }) => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [action, setAction] = useState<string>("");
-  const [timer, setTimer] = useState<number>(0); // Timer to track elapsed time
-  const [isProcessing, setIsProcessing] = useState<boolean>(false); // Flag to track video processing state
+  const [timer, setTimer] = useState<number>(0);
+  const [isProcessing, setIsProcessing] = useState<boolean>(false);
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -19,16 +19,14 @@ const VideoUploader: React.FC<VideoUploaderProps> = ({ onProcessVideo }) => {
     if (selectedFile && action) {
       alert("Video submitted! This process will take up to a few minutes.");
       setIsProcessing(true);
-      console.log("Timer started");
-      setTimer(0); // Reset timer when submitting the video
+      setTimer(0);
 
       try {
         await onProcessVideo(selectedFile, action);
-        // Stop the timer once processing is complete
         setIsProcessing(false);
         alert("Video processed successfully!");
       } catch (error) {
-        setIsProcessing(false); // Stop the timer even if an error occurs
+        setIsProcessing(false);
         alert("An error occurred while processing the video.");
       }
     } else {
@@ -40,13 +38,11 @@ const VideoUploader: React.FC<VideoUploaderProps> = ({ onProcessVideo }) => {
     let intervalId: NodeJS.Timeout | null = null;
 
     if (isProcessing) {
-      // Start the timer when processing starts
       intervalId = setInterval(() => {
         setTimer((prevTimer) => prevTimer + 1);
-      }, 1000); // Update every second
+      }, 1000);
     }
 
-    // Cleanup the interval on component unmount or when processing ends
     return () => {
       if (intervalId) clearInterval(intervalId);
     };
@@ -54,12 +50,8 @@ const VideoUploader: React.FC<VideoUploaderProps> = ({ onProcessVideo }) => {
 
   return (
     <div className="bg-white p-6 rounded-lg shadow-md w-full max-w-md">
-      {/* File Upload Section */}
       <div className="mb-4">
-        <label
-          htmlFor="videoFile"
-          className="block text-sm font-medium text-gray-700 mb-2"
-        >
+        <label htmlFor="videoFile" className="block text-sm font-medium text-gray-700 mb-2">
           Upload Video
         </label>
         <div className="flex items-center justify-center w-full">
@@ -80,9 +72,7 @@ const VideoUploader: React.FC<VideoUploaderProps> = ({ onProcessVideo }) => {
                 />
               </svg>
               <p className="mb-2 text-sm text-gray-500">
-                {selectedFile
-                  ? `Selected: ${selectedFile.name}`
-                  : "Click to upload or drag and drop"}
+                {selectedFile ? `Selected: ${selectedFile.name}` : "Click to upload or drag and drop"}
               </p>
               <p className="text-xs text-gray-400">MP4, AVI, MOV (Max 10GB)</p>
             </div>
@@ -96,12 +86,8 @@ const VideoUploader: React.FC<VideoUploaderProps> = ({ onProcessVideo }) => {
         </div>
       </div>
 
-      {/* Action Selection Section */}
       <div className="mb-4">
-        <label
-          htmlFor="action"
-          className="block text-sm font-medium text-gray-700 mb-2"
-        >
+        <label htmlFor="action" className="block text-sm font-medium text-gray-700 mb-2">
           Select Action
         </label>
         <select
@@ -117,7 +103,6 @@ const VideoUploader: React.FC<VideoUploaderProps> = ({ onProcessVideo }) => {
         </select>
       </div>
 
-      {/* Submit Button */}
       <button
         onClick={handleSubmit}
         disabled={!selectedFile || !action}
@@ -126,7 +111,6 @@ const VideoUploader: React.FC<VideoUploaderProps> = ({ onProcessVideo }) => {
         Process Video
       </button>
 
-      {/* Timer Display */}
       {isProcessing && (
         <div className="mt-4 text-gray-600">
           <p>Processing time: {timer} seconds</p>
