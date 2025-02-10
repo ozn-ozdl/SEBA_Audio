@@ -13,55 +13,104 @@ import {
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faTrash, faFolderOpen } from "@fortawesome/free-solid-svg-icons";
 
+// Interface for individual video description items (if needed)
 interface VideoDescriptionItem {
   startTime: number;
   endTime: number;
   description: string;
   audioFile?: string;
-  isEdited: boolean; // New flag
+  isEdited: boolean;
 }
 
+// Interface for project data. Note the added "owner" field.
 interface ProjectData {
   name: string;
   data: VideoDescriptionItem[];
   date: string;
   videoName: string;
   screenshot?: string;
+  owner: string; // The user who created this project
 }
 
 export function Dashboard() {
   const navigate = useNavigate();
   const [projectName, setProjectName] = useState("");
 
+  // Use localStorage to persist projects under the key "video_descriptions"
   const [videoDescriptionsStorage, setVideoDescriptionsStorage] =
     useLocalStorage<ProjectData[]>("video_descriptions", []);
 
+  // Retrieve the current logged-in user from localStorage
+  const currentUser = localStorage.getItem("currentUser");
+
+  // Filter the projects so that only projects created by the current user are shown
+  const userProjects = videoDescriptionsStorage.filter(
+    (project) => project.owner === currentUser
+  );
+
+  // Function to create a new project for the current user
   const handleCreateProject = (): void => {
     if (!projectName.trim()) {
       alert("Please enter a valid project name.");
       return;
     }
-    navigate(`/workspace?name=${projectName}`);
-    console.log("Projec name", projectName);
+    if (!currentUser) {
+      alert("No current user. Please log in.");
+      navigate("/login");
+      return;
+    }
+
+    // Check if a project with the same name for this user already exists
+    const exists = videoDescriptionsStorage.find(
+      (project) => project.name === projectName && project.owner === currentUser
+    );
+    if (!exists) {
+      const newProject: ProjectData = {
+        name: projectName,
+        data: [],
+        date: new Date().toLocaleString(),
+        videoName: "",
+        screenshot: "",
+        owner: currentUser,
+      };
+      setVideoDescriptionsStorage([...videoDescriptionsStorage, newProject]);
+    }
+    // Navigate to the workspace page for the created project
+    navigate(`/workspace?name=${encodeURIComponent(projectName)}`);
+    console.log("Project name", projectName);
   };
 
+  // Function to handle clicking on a project (opens the project workspace)
   const handleProjectClick = (project: ProjectData): void => {
     navigate(`/workspace?name=${encodeURIComponent(project.name)}`);
     console.log("Project name", project.name);
   };
 
+  // Function to delete a project belonging to the current user
   const handleDeleteProject = (projectName: string): void => {
     const updatedProjects = videoDescriptionsStorage.filter(
-      (item) => item.name !== projectName
+      (item) => !(item.name === projectName && item.owner === currentUser)
     );
     setVideoDescriptionsStorage(updatedProjects);
+  };
+
+  // Logout function: clears the current user and navigates to the login page
+  const handleLogout = (): void => {
+    localStorage.removeItem("currentUser");
+    navigate("/login");
   };
 
   return (
     <div className="p-6">
       <header className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold text-gray-700">Dashboard</h1>
-        <div className="flex space-x-4">
+        <div className="flex items-center space-x-4">
+          <Button
+            className="bg-red-500 text-white hover:bg-red-600"
+            onClick={handleLogout}
+          >
+            Logout
+          </Button>
           <input
             type="text"
             placeholder="New project name"
@@ -89,8 +138,8 @@ export function Dashboard() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {videoDescriptionsStorage.length > 0 ? (
-              videoDescriptionsStorage.map((item, index) => (
+            {userProjects.length > 0 ? (
+              userProjects.map((item, index) => (
                 <TableRow
                   key={item.name}
                   className={`${

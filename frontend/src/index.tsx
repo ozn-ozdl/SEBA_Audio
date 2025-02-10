@@ -4,6 +4,7 @@ import { BrowserRouter, Route, Routes } from "react-router-dom";
 import "./index.css";
 import { Dashboard } from "./pages/dashboard/index";
 import LandingPage from "./pages/landingPage";
+import LoginPage  from "./pages/loginPage";
 import { WorkSpace } from "./pages/workspace/index";
 import { SideBar } from "./components/SideBar";
 import reportWebVitals from "./reportWebVitals";
@@ -23,6 +24,7 @@ root.render(
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<LandingPage />} />
+        <Route path="/login" element={<LoginPage />} />
         <Route
           path="*"
           element={

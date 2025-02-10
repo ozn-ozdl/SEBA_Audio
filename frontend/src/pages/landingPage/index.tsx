@@ -82,10 +82,11 @@ const LandingPage: React.FC = () => {
         </p>
         <Button
           className="mt-8 px-8 py-4 bg-indigo-600 text-white text-lg rounded-full shadow-md hover:bg-indigo-500 transition"
-          onClick={() => (window.location.href = "/dashboard")}
+          onClick={() => (window.location.href = "/login?next=/dashboard")}
         >
           Get Started for Free
         </Button>
+
       </section>
 
       <section className="flex flex-col items-center justify-center py-16 px-4 bg-white">
