@@ -17,6 +17,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "./ui/tooltip";
+import { Pencil, AudioLines } from "lucide-react"; // Import icons
 
 interface SceneSelectionModalProps {
   isOpen: boolean;
@@ -68,6 +69,10 @@ const SceneSelectionModal: React.FC<SceneSelectionModalProps> = ({
 }) => {
   const allSelected = selectedScenes.size === scenes.length;
 
+  const isAudioFileDefined = (audioFile: string | undefined): boolean => {
+    return audioFile !== undefined && audioFile !== "";
+  };
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="bg-gray-900 p-8 rounded-xl shadow-2xl max-w-2xl w-full border border-gray-700">
@@ -106,14 +111,33 @@ const SceneSelectionModal: React.FC<SceneSelectionModalProps> = ({
                       className="h-5 w-5 text-white border-gray-500 data-[state=checked]:bg-indigo-400 mt-1"
                     />
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-baseline space-x-2">
+                      <div className="flex items-center space-x-2">
                         <Label
                           htmlFor={`scene-${scene.startTime}`}
-                          className="font-mono text-sm text-indigo-300"
+                          className="font-mono text-sm text-indigo-300 relative inline-flex items-center" // Key change here!
                         >
                           {`${(scene.startTime / 1000).toFixed(2)}s - ${(
                             scene.endTime / 1000
                           ).toFixed(2)}s`}
+                          <div className="ml-2 flex items-center">
+                            {" "}
+                            {/* Container for icons */}
+                            <Pencil
+                              className={`h-3 w-3 ${
+                                scene.isEdited
+                                  ? "text-green-500"
+                                  : "text-red-500"
+                              } opacity-100`}
+                            />
+                            <AudioLines
+                              className={`h-3 w-3 ml-1 ${
+                                // Added margin left
+                                isAudioFileDefined(scene.audioFile)
+                                  ? "text-green-500"
+                                  : "text-red-500"
+                              } opacity-100`}
+                            />
+                          </div>
                         </Label>
                       </div>
                       <p className="text-gray-300 text-base mt-1 line-clamp-2 hover:line-clamp-none transition-all">
@@ -138,7 +162,7 @@ const SceneSelectionModal: React.FC<SceneSelectionModalProps> = ({
                   className={`${buttonStyles.base} ${buttonStyles.variants.outline} ${buttonStyles.sizes.md}`}
                   onClick={onClose}
                 >
-                  Cancel
+                  Close
                 </Button>
               </TooltipTrigger>
               <TooltipContent className="text-white">
@@ -152,7 +176,7 @@ const SceneSelectionModal: React.FC<SceneSelectionModalProps> = ({
                   className={`${buttonStyles.base} ${buttonStyles.variants.default} ${buttonStyles.sizes.md}`}
                   onClick={onGenerateDescriptions}
                 >
-                  Descriptions
+                  Regenerate Descriptions
                 </Button>
               </TooltipTrigger>
               <TooltipContent className="text-white">
@@ -166,7 +190,7 @@ const SceneSelectionModal: React.FC<SceneSelectionModalProps> = ({
                   className={`${buttonStyles.base} ${buttonStyles.variants.default} ${buttonStyles.sizes.md}`}
                   onClick={onRegenerateAudio}
                 >
-                  Audio
+                  Regenerate Audio
                 </Button>
               </TooltipTrigger>
               <TooltipContent className="text-white">

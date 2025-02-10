@@ -77,7 +77,7 @@ const TeamPage: React.FC = () => {
         </section>
 
         {/* Contact Section */}
-        <section className="mt-16 bg-white rounded-lg shadow-lg p-8 max-w-4xl mx-auto">
+        {/* <section className="mt-16 bg-white rounded-lg shadow-lg p-8 max-w-4xl mx-auto">
           <h2 className="text-3xl font-bold text-center text-gray-800 mb-6">
             Contact Us
           </h2>
@@ -107,7 +107,7 @@ const TeamPage: React.FC = () => {
               support@narrifai.com
             </a>
           </div>
-        </section>
+        </section> */}
       </main>
 
       {/* Footer */}

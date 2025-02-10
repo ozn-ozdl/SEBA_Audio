@@ -1,5 +1,5 @@
-import React, { useEffect } from "react";
-import { RefreshCw, Settings, Sparkles, Video } from "lucide-react";
+import React, { useEffect, useState } from "react";
+import { Download, RefreshCw, Settings, Sparkles, Video } from "lucide-react";
 import { Button } from "src/components/ui/button";
 import {
   Tooltip,
@@ -19,17 +19,17 @@ interface VideoHeaderProps {
 }
 
 const buttonStyles = {
-  base: "transition-all duration-150 font-medium text-sm px-4 py-2 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:pointer-events-none",
+  base: "transition-all duration-150 rounded-full font-medium text-sm px-4 py-2 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:pointer-events-none",
   variants: {
     default:
-      "bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm hover:shadow-indigo-500/30",
+      "bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm hover:shadow-indigo-500/30 rounded-full",
     secondary:
-      "bg-gray-800 hover:bg-gray-700 text-gray-100 shadow-sm hover:shadow-gray-500/20",
-    ghost: "hover:bg-gray-800/50 text-gray-300 hover:text-gray-100",
+      "bg-gray-800 hover:bg-gray-700 text-gray-100 shadow-sm hover:shadow-gray-500/20 rounded-full",
+    ghost: "hover:bg-gray-800/50 text-gray-300 hover:text-gray-100 rounded-full",
     outline:
-      "border border-gray-600 hover:border-gray-500 bg-gray-900/80 text-gray-300 hover:text-gray-100",
+      "border border-gray-600 hover:border-gray-500 bg-gray-900/80 text-gray-300 hover:text-gray-100 rounded-full",
     destructive:
-      "bg-red-600 hover:bg-red-700 text-white shadow-sm hover:shadow-red-500/30",
+      "bg-red-600 hover:bg-red-700 text-white shadow-sm hover:shadow-red-500/30 rounded-full",
   },
   sizes: {
     sm: "px-3 py-1.5 text-xs",
@@ -44,17 +44,26 @@ export const VideoHeader: React.FC<VideoHeaderProps> = ({
   onReanalyze,
   onRegenerateAudio,
   uploadedVideo,
-  videoDescriptions,
+  videoDescriptions: initialVideoDescriptions, // Rename for clarity
 }) => {
-  let hasNoAudio = videoDescriptions.some((desc) => !desc.audioFile); // Check if any description has audio
-  const [isVideoUploaded, setIsVideoUploaded] = React.useState(false);
-  let isNotEdited = videoDescriptions.every((desc) => !desc.isEdited); // Check if all descriptions are not edited
+  const [videoDescriptions, setVideoDescriptions] = useState<VideoDescriptionItem[]>(initialVideoDescriptions); // State for filtered descriptions
+  let hasNoAudio = videoDescriptions.some((desc) => !desc.audioFile);
+  const [isVideoUploaded, setIsVideoUploaded] = useState(false);
+  let isNotEdited = videoDescriptions.every((desc) => !desc.isEdited);
 
-  // check on description change if video is not edited
+  useEffect(() => {
+    // Filter out "TALKING" scenes when initialVideoDescriptions changes
+    const filteredDescriptions = initialVideoDescriptions.filter(
+      (desc) => !desc.description.toUpperCase().includes("TALKING")
+    );
+    setVideoDescriptions(filteredDescriptions);
+  }, [initialVideoDescriptions]); // Crucial: Add initialVideoDescriptions as a dependency
+
+
   useEffect(() => {
     if (videoDescriptions.length > 0) {
-      isNotEdited = videoDescriptions.every((desc) => !desc.isEdited); // Check if all descriptions are not edited
-      hasNoAudio = videoDescriptions.some((desc) => !desc.audioFile); // Check if any description has audio
+      isNotEdited = videoDescriptions.every((desc: { isEdited: boolean; }) => !desc.isEdited);
+      hasNoAudio = videoDescriptions.some((desc) => !desc.audioFile);
     }
   }, [videoDescriptions]);
 
@@ -91,7 +100,7 @@ export const VideoHeader: React.FC<VideoHeaderProps> = ({
             </TooltipContent>
           </Tooltip>
           {/* Regenerate Button */}
-          <Tooltip>
+          {/* <Tooltip>
             <TooltipTrigger asChild>
               <Button
                 variant="secondary"
@@ -106,7 +115,7 @@ export const VideoHeader: React.FC<VideoHeaderProps> = ({
             <TooltipContent className="text-white">
               <p>Select scenes to regenerate descriptions or audio</p>
             </TooltipContent>
-          </Tooltip>
+          </Tooltip> */}
           {/* Encode Button */}
           <Tooltip>
             <TooltipTrigger asChild>
@@ -116,7 +125,7 @@ export const VideoHeader: React.FC<VideoHeaderProps> = ({
                 onClick={onEncode}
                 disabled={!isVideoUploaded || hasNoAudio || isNotEdited} // Disable if no video or no audio or not all descriptions are not edited
               >
-                <Video className="w-4 h-4 mr-2" />
+                <Download className="w-4 h-4 mr-2" />
                 Encode Video
               </Button>
             </TooltipTrigger>

@@ -64,9 +64,9 @@ interface ProjectData {
   date: string;
   videoName: string;
   screenshot?: string;
-  videoUrl?: string;
-  srtUrl?: string;
-  audioUrl?: string;
+  videoUrl: string | null;
+  srtUrl: string | null;
+  audioUrl: string | null;
 }
 
 const Workspace3: React.FC = () => {
@@ -101,6 +101,7 @@ const Workspace3: React.FC = () => {
   const [videoDownloadUrl, setVideoDownloadUrl] = useState<string | null>(null);
   const [srtDownloadUrl, setSrtDownloadUrl] = useState<string | null>(null);
   const [talkingSrtUrl, setTalkingSrtUrl] = useState<string | null>(null);
+  const [isModalOpen, setModalOpen] = useState(false);
 
   const backendBaseUrl = "http://localhost:5000"; // Replace if different
   // Add to Workspace3 component:
@@ -195,18 +196,17 @@ const Workspace3: React.FC = () => {
   };
 
   const parseSrtFile = (srtText: string): VideoDescriptionItem[] => {
-    // Split by double newline to separate entries
-    const entries = srtText.trim().split("\n\n");
+    const entries = srtText.trim().split(/\n\s*\n/);
 
     return entries
-      .map((entry) => {
+      .map((entry): VideoDescriptionItem | null => {
+        // Explicitly type the map's return
         const lines = entry.split("\n");
-        // Skip the index number (first line)
+        if (lines.length < 2) return null;
+
         const timeLine = lines[1];
-        // Join remaining lines as description
         const description = lines.slice(2).join(" ").trim();
 
-        // Extract timestamps
         const [startTime, endTime] = timeLine.split(" --> ");
 
         return {
@@ -216,9 +216,7 @@ const Workspace3: React.FC = () => {
           isEdited: true,
         };
       })
-      .filter(
-        (item) => item.startTime >= 0 && item.endTime > 0 && item.description
-      );
+      .filter((item): item is VideoDescriptionItem => item !== null); // Type guard for filtering
   };
 
   const handleSrtFileUpload = useCallback(
@@ -230,11 +228,15 @@ const Workspace3: React.FC = () => {
 
         reader.onload = (e) => {
           const srtText = e.target?.result as string;
-          const newVideoDescriptionItems = parseSrtFile(srtText);
-
-          // Update the videoDescriptions state
-          setVideoDescriptions(newVideoDescriptionItems);
-          setIsSrtModalOpen(false); // Close the modal after upload
+          try {
+            // Add a try-catch block for parsing errors
+            const newVideoDescriptionItems = parseSrtFile(srtText);
+            setVideoDescriptions(newVideoDescriptionItems);
+            setIsSrtModalOpen(false);
+          } catch (error) {
+            console.error("Error parsing SRT file:", error);
+            showNotification("Error", "Invalid SRT file format.", "error"); // More specific error message
+          }
         };
 
         reader.onerror = () => {
@@ -244,9 +246,8 @@ const Workspace3: React.FC = () => {
         reader.readAsText(file);
       }
     },
-    [parseSrtFile, setVideoDescriptions, setIsSrtModalOpen]
+    [parseSrtFile, setVideoDescriptions, setIsSrtModalOpen, showNotification] // Add showNotification to the dependency array
   );
-
   const toggleSrtModal = () => {
     setIsSrtModalOpen(!isSrtModalOpen);
   };
@@ -445,6 +446,7 @@ const Workspace3: React.FC = () => {
 
         setVideoDescriptions(mergedDescriptions);
         setPreviousDescriptions(mergedDescriptions);
+        setModalOpen(false);
         showNotification(
           "Success",
           "Video reanalyzed successfully!",
@@ -560,6 +562,7 @@ const Workspace3: React.FC = () => {
         "error"
       );
     } finally {
+      setModalOpen(false);
       setIsProcessing(false); // End processing state
       setProcessingProgress(0);
       setProcessingMessage("");
@@ -663,7 +666,7 @@ const Workspace3: React.FC = () => {
         showNotification("Warning", "Failed to generate thumbnail.", "warning");
       }
     }
-
+    console.log(videoDescriptionsStorage);
     setVideoDescriptionsStorage([
       ...videoDescriptionsStorage.filter((item) => item.name !== projectName),
       {
@@ -672,12 +675,12 @@ const Workspace3: React.FC = () => {
         date: currentDate,
         videoName: videoName || "",
         screenshot,
-        videoUrl: `${backendBaseUrl}/downloads/${projectName}_processed.mp4`,
-        srtUrl: `${backendBaseUrl}/downloads/${projectName}_subtitles.srt`,
-        audioUrl: `${backendBaseUrl}/downloads/${projectName}_audio.mp3`,
+        videoUrl: videoDownloadUrl,
+        srtUrl: srtDownloadUrl,
+        audioUrl: talkingSrtUrl,
       },
     ]);
-
+    console.log(videoDescriptionsStorage);
     showNotification(
       "Success",
       "Your work has been successfully saved!",
@@ -933,6 +936,19 @@ const Workspace3: React.FC = () => {
     }
   };
 
+  const getAlertClassName = (type: "default" | "error" | "warning" | "success") => {
+    switch (type) {
+      case "error":
+        return "backdrop-blur-sm bg-red-800/70 text-white border border-red-500 p-4 rounded-lg shadow-lg";
+      case "warning":
+        return "backdrop-blur-sm bg-yellow-800/70 text-white border border-yellow-500 p-4 rounded-lg shadow-lg";
+      case "success":
+        return "backdrop-blur-sm bg-green-800/70 text-white border border-green-500 p-4 rounded-lg shadow-lg";
+      default:  // "default" or any other case
+        return "backdrop-blur-sm bg-gray-900/70 text-white border border-gray-500 p-4 rounded-lg shadow-lg";
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-indigo-900/100 via-purple-700/100 to-indigo-600/100 flex flex-col">
       <main className="flex-grow h-screen overflow-hidden">
@@ -958,6 +974,8 @@ const Workspace3: React.FC = () => {
           onRegenerateAudio={handleRegenerateAudio}
           videoFile={videoFile}
           setVideoFile={setVideoFile}
+          setModalOpen={setModalOpen}
+          isModalOpen={isModalOpen}
         />
         {notification && (
           <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 max-w-md animate-in fade-in slide-in-from-top-2">
@@ -965,15 +983,14 @@ const Workspace3: React.FC = () => {
               variant={
                 notification.type === "error" ? "destructive" : "default"
               }
-              className={`
-        ${notification.type === "success" && "border-green-500 text-green-500"}
-        ${
-          notification.type === "warning" && "border-yellow-500 text-yellow-500"
-        }
-      `}
+              className={getAlertClassName(notification.type)} // Dynamic class name
             >
-              <AlertTitle>{notification.title}</AlertTitle>
-              <AlertDescription>{notification.message}</AlertDescription>
+              <AlertTitle className="font-semibold">
+                {notification.title}
+              </AlertTitle>
+              <AlertDescription className="mt-1">
+                {notification.message}
+              </AlertDescription>
             </Alert>
           </div>
         )}
@@ -1071,14 +1088,14 @@ const Workspace3: React.FC = () => {
             >
               <Upload className="w-6 h-6" />
             </Button>
-            <Button
+            {/* <Button
               variant="default"
               className="p-3 rounded-full shadow-md hover:bg-blue-600 transition"
               onClick={downloadAll}
               disabled={!videoDownloadUrl || !srtDownloadUrl || !talkingSrtUrl}
             >
               <Download className="w-6 h-6" />
-            </Button>
+            </Button> */}
           </div>
         </div>
       </main>
