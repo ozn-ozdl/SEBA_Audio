@@ -46,8 +46,17 @@ export const VideoHeader: React.FC<VideoHeaderProps> = ({
   uploadedVideo,
   videoDescriptions,
 }) => {
-  const hasAudio = videoDescriptions.some((desc) => desc.audioFile); // Check if any description has audio
+  let hasNoAudio = videoDescriptions.some((desc) => !desc.audioFile); // Check if any description has audio
   const [isVideoUploaded, setIsVideoUploaded] = React.useState(false);
+  let isNotEdited = videoDescriptions.every((desc) => !desc.isEdited); // Check if all descriptions are not edited
+
+  // check on description change if video is not edited
+  useEffect(() => {
+    if (videoDescriptions.length > 0) {
+      isNotEdited = videoDescriptions.every((desc) => !desc.isEdited); // Check if all descriptions are not edited
+      hasNoAudio = videoDescriptions.some((desc) => !desc.audioFile); // Check if any description has audio
+    }
+  }, [videoDescriptions]);
 
   useEffect(() => {
     if (uploadedVideo) {
@@ -105,7 +114,7 @@ export const VideoHeader: React.FC<VideoHeaderProps> = ({
                 variant="default"
                 className={`${buttonStyles.base} ${buttonStyles.variants.default} ${buttonStyles.sizes.md}`}
                 onClick={onEncode}
-                disabled={!isVideoUploaded || !hasAudio} // Disable if no video or no audio in descriptions
+                disabled={!isVideoUploaded || hasNoAudio || isNotEdited} // Disable if no video or no audio or not all descriptions are not edited
               >
                 <Video className="w-4 h-4 mr-2" />
                 Encode Video

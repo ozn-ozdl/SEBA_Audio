@@ -1,13 +1,11 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import {
-  Video,
-  Play,
-  Pause,
   Save,
   RefreshCw,
   ChevronUp,
   ChevronDown,
   Upload,
+  Download,
 } from "lucide-react";
 import TranscriptionEditor3 from "src/components/Editor3";
 import { Button } from "src/components/ui/button";
@@ -30,6 +28,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "src/components/ui/tooltip";
+import { Alert, AlertDescription, AlertTitle } from "src/components/ui/alert";
 
 interface VideoDescriptionItem {
   startTime: number;
@@ -59,53 +58,15 @@ const buttonStyles = {
   },
 };
 
-const timestampToMilliseconds = (timestamp: string): number => {
-  const [hours, minutes, secondsWithMs] = timestamp.split(":");
-  const [seconds, milliseconds] = secondsWithMs.split(".");
-
-  const totalMilliseconds =
-    parseInt(hours) * 3600000 +
-    parseInt(minutes) * 60000 +
-    parseInt(seconds) * 1000 +
-    parseInt(milliseconds) * 10;
-  console.log("totalMilliseconds:", totalMilliseconds);
-  return totalMilliseconds;
-};
-
-// Universal timestamp normalization
-const normalizeTimestamp = (timestamp: number | string): string => {
-  // If already a string timestamp, return as-is
-  if (
-    typeof timestamp === "string" &&
-    /^\d{2}:\d{2}:\d{2}\.\d+$/.test(timestamp)
-  ) {
-    return timestamp;
-  }
-
-  // Convert milliseconds to HH:MM:SS.mmm format
-  const totalSeconds = Math.floor(Number(timestamp) / 1000);
-  const hours = Math.floor(totalSeconds / 3600)
-    .toString()
-    .padStart(2, "0");
-  const minutes = Math.floor((totalSeconds % 3600) / 60)
-    .toString()
-    .padStart(2, "0");
-  const seconds = (totalSeconds % 60).toString().padStart(2, "0");
-  const milliseconds = (Number(timestamp) % 1000).toString().padStart(3, "0");
-
-  return `${hours}:${minutes}:${seconds}.${milliseconds}`;
-};
-
 interface ProjectData {
   name: string;
   data: VideoDescriptionItem[];
   date: string;
   videoName: string;
   screenshot?: string;
-}
-
-interface Workspace3Props {
-  projectName: string;
+  videoUrl?: string;
+  srtUrl?: string;
+  audioUrl?: string;
 }
 
 const Workspace3: React.FC = () => {
@@ -137,8 +98,27 @@ const Workspace3: React.FC = () => {
   const [hasLoadedInitialData, setHasLoadedInitialData] = useState(false); // New flag
 
   const [videoFile, setVideoFile] = useState<File | null>(null);
+  const [videoDownloadUrl, setVideoDownloadUrl] = useState<string | null>(null);
+  const [srtDownloadUrl, setSrtDownloadUrl] = useState<string | null>(null);
+  const [talkingSrtUrl, setTalkingSrtUrl] = useState<string | null>(null);
 
   const backendBaseUrl = "http://localhost:5000"; // Replace if different
+  // Add to Workspace3 component:
+  const [notification, setNotification] = useState<{
+    show: boolean;
+    title: string;
+    message: string;
+    type: "default" | "error" | "warning" | "success";
+  } | null>(null);
+
+  const showNotification = (
+    title: string,
+    message: string,
+    type: "default" | "error" | "warning" | "success"
+  ) => {
+    setNotification({ show: true, title, message, type });
+    setTimeout(() => setNotification(null), 3000);
+  };
 
   useEffect(() => {
     // Load data from local storage if available
@@ -194,18 +174,18 @@ const Workspace3: React.FC = () => {
         console.log("Video file:", videoFile);
       } else {
         console.error("Failed to fetch video file:", response.status);
-        alert("Failed to fetch video file.");
+        showNotification("Error", "Failed to fetch video file.", "error");
       }
     } catch (error) {
       console.error("Error fetching video file:", error);
-      alert("Error fetching video file.");
+      showNotification("Error", "Error fetching video file.", "error");
     }
   };
 
   const timestampToMilliseconds = (timestamp: string): number => {
-    const [time, milliseconds] = timestamp.trim().split(',');
-    const [hours, minutes, seconds] = time.split(':');
-    
+    const [time, milliseconds] = timestamp.trim().split(",");
+    const [hours, minutes, seconds] = time.split(":");
+
     return (
       parseInt(hours) * 3600000 +
       parseInt(minutes) * 60000 +
@@ -213,30 +193,34 @@ const Workspace3: React.FC = () => {
       parseInt(milliseconds)
     );
   };
-  
+
   const parseSrtFile = (srtText: string): VideoDescriptionItem[] => {
     // Split by double newline to separate entries
-    const entries = srtText.trim().split('\n\n');
-    
-    return entries.map(entry => {
-      const lines = entry.split('\n');
-      // Skip the index number (first line)
-      const timeLine = lines[1];
-      // Join remaining lines as description
-      const description = lines.slice(2).join(' ').trim();
-      
-      // Extract timestamps
-      const [startTime, endTime] = timeLine.split(' --> ');
-      
-      return {
-        startTime: timestampToMilliseconds(startTime),
-        endTime: timestampToMilliseconds(endTime),
-        description,
-        isEdited: true
-      };
-    }).filter(item => item.startTime >= 0 && item.endTime > 0 && item.description);
+    const entries = srtText.trim().split("\n\n");
+
+    return entries
+      .map((entry) => {
+        const lines = entry.split("\n");
+        // Skip the index number (first line)
+        const timeLine = lines[1];
+        // Join remaining lines as description
+        const description = lines.slice(2).join(" ").trim();
+
+        // Extract timestamps
+        const [startTime, endTime] = timeLine.split(" --> ");
+
+        return {
+          startTime: timestampToMilliseconds(startTime),
+          endTime: timestampToMilliseconds(endTime),
+          description,
+          isEdited: true,
+        };
+      })
+      .filter(
+        (item) => item.startTime >= 0 && item.endTime > 0 && item.description
+      );
   };
-  
+
   const handleSrtFileUpload = useCallback(
     (event: React.ChangeEvent<HTMLInputElement>) => {
       const file = event.target.files?.[0];
@@ -254,7 +238,7 @@ const Workspace3: React.FC = () => {
         };
 
         reader.onerror = () => {
-          alert("Error reading SRT file.");
+          showNotification("Error", "Error reading SRT file.", "error");
         };
 
         reader.readAsText(file);
@@ -290,9 +274,13 @@ const Workspace3: React.FC = () => {
   const reloadPreviousDescriptions = () => {
     if (previousDescriptions.length > 0) {
       setVideoDescriptions([...previousDescriptions]);
-      alert("Previous descriptions reloaded successfully!");
+      showNotification("Success", "Previous descriptions reloaded.", "success");
     } else {
-      alert("No previous descriptions available to reload.");
+      showNotification(
+        "Error",
+        "No previous descriptions available to reload.",
+        "error"
+      );
     }
   };
 
@@ -374,8 +362,10 @@ const Workspace3: React.FC = () => {
       console.log("Video Description Items:", videoDescriptionItems);
     } catch (error) {
       console.error("Processing error:", error);
-      alert(
-        `Error: ${error instanceof Error ? error.message : "Unknown error"}`
+      showNotification(
+        "Error",
+        error instanceof Error ? error.message : "Unknown error",
+        "error"
       );
     } finally {
       setIsProcessing(false);
@@ -388,7 +378,11 @@ const Workspace3: React.FC = () => {
     selectedSceneStartTimes: number[]
   ): Promise<void> => {
     if (!selectedSceneStartTimes.length) {
-      alert("No scenes selected for reanalysis");
+      showNotification(
+        "No Selection",
+        "Please select scenes to reanalyze",
+        "error"
+      );
       return;
     }
 
@@ -451,20 +445,32 @@ const Workspace3: React.FC = () => {
 
         setVideoDescriptions(mergedDescriptions);
         setPreviousDescriptions(mergedDescriptions);
-        alert("Video reanalyzed successfully!");
+        showNotification(
+          "Success",
+          "Video reanalyzed successfully!",
+          "success"
+        );
       } else {
         const error = await response.json();
-        alert(`Error: ${error.error || "Unknown error"}`);
+        showNotification("Error", error.error || "Unknown error", "error");
       }
     } catch (error) {
       console.error("Reanalysis error:", error);
-      alert("Failed to connect to server");
+      showNotification(
+        "Connection Error",
+        "Failed to connect to server",
+        "error"
+      );
     }
   };
 
   const handleRegenerateAudio = async (): Promise<void> => {
     if (selectedScenes.size === 0) {
-      alert("Please select scenes to regenerate audio");
+      showNotification(
+        "No Selection",
+        "Please select scenes to regenerate audio",
+        "error"
+      );
       return;
     }
 
@@ -545,11 +551,13 @@ const Workspace3: React.FC = () => {
 
       // Final update to state
       setVideoDescriptions(updatedDescriptions);
-      alert("Audio regeneration complete!");
+      showNotification("Success", "Audio regeneration complete!", "success");
     } catch (error) {
       console.error("Audio regeneration error:", error);
-      alert(
-        `Error: ${error instanceof Error ? error.message : "Unknown error"}`
+      showNotification(
+        "Error",
+        error instanceof Error ? error.message : "Unknown error",
+        "error"
       );
     } finally {
       setIsProcessing(false); // End processing state
@@ -584,10 +592,18 @@ const Workspace3: React.FC = () => {
             setAudio(null);
           };
         } else {
-          alert("Error generating audio description");
+          showNotification(
+            "Generation Error",
+            "Error generating audio description.",
+            "error"
+          );
         }
       } catch (error) {
-        alert("Error connecting to backend");
+        showNotification(
+          "Connection Error",
+          "Error connecting to backend",
+          "error"
+        );
       }
     } else {
       if (audio) {
@@ -627,263 +643,80 @@ const Workspace3: React.FC = () => {
   };
 
   const handleSave = async () => {
-    if (videoDescriptions.length === 0) {
-      alert("Please process a video and ensure descriptions are available.");
+    if (!videoDescriptions.length) {
+      showNotification(
+        "No Content",
+        "Please process a video and ensure descriptions are available.",
+        "error"
+      );
       return;
     }
 
     const currentDate = new Date().toLocaleDateString();
-
-    console.log("Project name", projectName);
     let screenshot = "";
+
     if (uploadedVideo) {
       try {
         screenshot = await generateThumbnail(uploadedVideo);
       } catch (error) {
-        console.error("Error generating thumbnail:", error);
-        alert("Failed to generate thumbnail.");
+        console.error("Thumbnail generation failed:", error);
+        showNotification("Warning", "Failed to generate thumbnail.", "warning");
       }
     }
 
-    // Save the video descriptions to local storage
     setVideoDescriptionsStorage([
-      ...(videoDescriptionsStorage || []).filter(
-        (item) => item.name !== projectName
-      ),
+      ...videoDescriptionsStorage.filter((item) => item.name !== projectName),
       {
         name: projectName,
         data: videoDescriptions,
         date: currentDate,
         videoName: videoName || "",
-        screenshot: screenshot,
+        screenshot,
+        videoUrl: `${backendBaseUrl}/downloads/${projectName}_processed.mp4`,
+        srtUrl: `${backendBaseUrl}/downloads/${projectName}_subtitles.srt`,
+        audioUrl: `${backendBaseUrl}/downloads/${projectName}_audio.mp3`,
       },
     ]);
 
-    alert("Your work has been successfully saved!");
+    showNotification(
+      "Success",
+      "Your work has been successfully saved!",
+      "success"
+    );
   };
 
-  // const handleEncodeVideo = async (videofile: File) => {
-  //   if (!videofile) {
-  //     alert("Please upload a video before encoding.");
-  //     return;
-  //   }
+  const downloadFile = (url: string, filename: string) => {
+    const fullUrl = backendBaseUrl + url;
+    console.log("Downloading from:", fullUrl);
+    fetch(fullUrl)
+      .then((response) => response.blob())
+      .then((blob) => {
+        const link = document.createElement("a");
+        link.href = URL.createObjectURL(blob);
+        link.setAttribute("download", filename);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(link.href); // Clean up the URL object
+      })
+      .catch((error) => {
+        console.error("Download error:", error);
+        showNotification("Error", `Error downloading ${filename}`, "error");
+      });
+  };
 
-  //   const descriptions = videoDescriptions.map((item) => item.description);
-  //   // .filter((desc) => desc !== "TALKING");
-  //   const timestamps = videoDescriptions.map((item) => [
-  //     item.startTime,
-  //     item.endTime,
-  //   ]);
-  //   const audioFiles = videoDescriptions
-  //     .map((item) => item.audioFile)
-  //     .filter((audioFile) => audioFile); // Extract audio file names
-  //   const videoFileName = videofile.name;
-
-  //   console.log("Descriptions:", descriptions);
-  //   console.log("Timestamps:", timestamps);
-  //   console.log("Audio Files:", audioFiles);
-  //   console.log("VideoDesc:", videoDescriptions);
-
-  //   if (descriptions.length === 0) {
-  //     alert(
-  //       "No valid descriptions to encode. Ensure at least one description is not 'TALKING'."
-  //     );
-  //     return;
-  //   }
-
-  //   try {
-  //     const response = await fetch(
-  //       "http://localhost:5000/encode-video-with-subtitles",
-  //       {
-  //         method: "POST",
-  //         headers: {
-  //           "Content-Type": "application/json",
-  //         },
-  //         body: JSON.stringify({
-  //           descriptions,
-  //           timestamps,
-  //           audioFiles, // Send audio file names
-  //           videoFileName,
-  //         }),
-  //       }
-  //     );
-
-  //     if (response.ok) {
-  //       const videoBlob = await response.blob();
-  //       const videoUrl = URL.createObjectURL(videoBlob);
-
-  //       const link = document.createElement("a");
-  //       link.href = videoUrl;
-  //       link.download = `processed_${videoFileName}`;
-  //       document.body.appendChild(link);
-  //       link.click();
-  //       document.body.removeChild(link);
-
-  //       alert("Video successfully encoded and downloaded.");
-  //     } else {
-  //       const error = await response.json();
-  //       alert(`Error encoding video: ${error.error}`);
-  //     }
-  //   } catch (error) {
-  //     console.error("Error encoding video:", error);
-  //     alert("Error connecting to the backend.");
-  //   }
-  // };
-
-  // const handleEncodeVideo = async (videofile: File) => {
-  //   if (!videofile) {
-  //     alert("Please upload a video before encoding.");
-  //     return;
-  //   }
-
-  //   const descriptions = videoDescriptions.map((item) => item.description);
-  //   const timestamps = videoDescriptions.map((item) => [
-  //     item.startTime,
-  //     item.endTime,
-  //   ]);
-  //   const audioFiles = videoDescriptions
-  //     .map((item) => item.audioFile)
-  //     .filter((audioFile) => audioFile);
-  //   const videoFileName = videofile.name;
-
-  //   console.log("Descriptions:", descriptions);
-  //   console.log("Timestamps:", timestamps);
-  //   console.log("Audio Files:", audioFiles);
-  //   console.log("VideoDesc:", videoDescriptions);
-
-  //   if (descriptions.length === 0) {
-  //     alert(
-  //       "No valid descriptions to encode. Ensure at least one description is not 'TALKING'."
-  //     );
-  //     return;
-  //   }
-
-  //   try {
-  //     const response = await fetch(
-  //       "http://localhost:5000/encode-video-with-subtitles",
-  //       {
-  //         method: "POST",
-  //         headers: {
-  //           "Content-Type": "application/json",
-  //         },
-  //         body: JSON.stringify({
-  //           descriptions,
-  //           timestamps,
-  //           audioFiles,
-  //           videoFileName,
-  //         }),
-  //       }
-  //     );
-
-  //     if (response.ok) {
-  //       const data = await response.json();
-
-  //       // Download Video
-  //       const videoBlob = new Blob([data.video], { type: "video/mp4" });
-  //       const videoUrl = URL.createObjectURL(videoBlob);
-  //       const videoLink = document.createElement("a");
-  //       videoLink.href = videoUrl;
-  //       videoLink.download = `processed_${videoFileName}`;
-  //       document.body.appendChild(videoLink);
-  //       videoLink.click();
-  //       document.body.removeChild(videoLink);
-
-  //       alert("Video successfully encoded and downloaded.");
-  //     } else {
-  //       const error = await response.json();
-  //       alert(`Error encoding video: ${error.error}`);
-  //     }
-  //   } catch (error) {
-  //     console.error("Error encoding video:", error);
-  //     alert("Error connecting to the backend.");
-  //   }
-  // };
-
-  // const handleEncodeVideo = async (videofile: File) => {
-  //   if (!videofile) {
-  //     alert("Please upload a video before encoding.");
-  //     return;
-  //   }
-
-  //   const descriptions = videoDescriptions.map((item) => item.description);
-  //   const timestamps = videoDescriptions.map((item) => [
-  //     item.startTime,
-  //     item.endTime,
-  //   ]);
-  //   const audioFiles = videoDescriptions
-  //     .map((item) => item.audioFile)
-  //     .filter((audioFile) => audioFile);
-  //   const videoFileName = videofile.name;
-
-  //   console.log("Descriptions:", descriptions);
-  //   console.log("Timestamps:", timestamps);
-  //   console.log("Audio Files:", audioFiles);
-  //   console.log("VideoDesc:", videoDescriptions);
-
-  //   if (descriptions.length === 0) {
-  //     alert(
-  //       "No valid descriptions to encode. Ensure at least one description is not 'TALKING'."
-  //     );
-  //     return;
-  //   }
-  //   try {
-  //     const response = await fetch(
-  //       "http://localhost:5000/encode-video-with-subtitles", // Ensure this is correct
-  //       {
-  //         method: "POST",
-  //         headers: {
-  //           "Content-Type": "application/json",
-  //         },
-  //         body: JSON.stringify({
-  //           descriptions,
-  //           timestamps,
-  //           audioFiles,
-  //           videoFileName,
-  //         }),
-  //       }
-  //     );
-
-  //     if (response.ok) {
-  //       const data = await response.json();
-
-  //       const downloadVideo = (url) => {
-  //         const fullUrl = backendBaseUrl + url;
-  //         console.log("Downloading video from:", fullUrl); // Add this line
-  //         const link = document.createElement("a");
-  //         link.href = fullUrl;
-  //         link.setAttribute("download", "processed_video.mp4");
-  //         document.body.appendChild(link);
-  //         link.click();
-  //         document.body.removeChild(link);
-  //       };
-
-  //       const downloadSrt = (url) => {
-  //         const fullUrl = backendBaseUrl + url; // Construct the full URL
-  //         const link = document.createElement("a");
-  //         link.href = fullUrl;
-  //         link.setAttribute("download", "subtitles.srt");
-  //         document.body.appendChild(link);
-  //         link.click();
-  //         document.body.removeChild(link);
-  //       };
-
-  //       downloadVideo(data.video_url);
-  //       downloadSrt(data.srt_url);
-
-  //       alert("Video and subtitles processing complete. Downloads started.");
-  //     } else {
-  //       const error = await response.json();
-  //       alert(`Error encoding video: ${error.error}`);
-  //     }
-  //   } catch (error) {
-  //     console.error("Error encoding video:", error);
-  //     alert("Error connecting to the backend.");
-  //   }
-  // };
+  const extractFilename = (url: string): string => {
+    const parts = url.split("/");
+    return parts[parts.length - 1];
+  };
 
   const handleEncodeVideo = async (videofile: File) => {
     if (!videofile) {
-      alert("Please upload a video before encoding.");
+      showNotification(
+        "Missing Video",
+        "Please upload a video before encoding.",
+        "error"
+      );
       return;
     }
 
@@ -903,8 +736,10 @@ const Workspace3: React.FC = () => {
     console.log("VideoDesc:", videoDescriptions);
 
     if (descriptions.length === 0) {
-      alert(
-        "No valid descriptions to encode. Ensure at least one description is not 'TALKING'."
+      showNotification(
+        "No Descriptions",
+        "No valid descriptions to encode. Ensure at least one description exists.",
+        "error"
       );
       return;
     }
@@ -929,71 +764,58 @@ const Workspace3: React.FC = () => {
       if (response.ok) {
         const data = await response.json();
 
-        const extractFilename = (url: string): string => {
-          const parts = url.split("/");
-          return parts[parts.length - 1];
-        };
-
-        const downloadFile = (url: string, filename: string) => {
-          const fullUrl = backendBaseUrl + url;
-          console.log("Downloading from:", fullUrl);
-          fetch(fullUrl)
-            .then((response) => response.blob())
-            .then((blob) => {
-              const link = document.createElement("a");
-              link.href = URL.createObjectURL(blob);
-              link.setAttribute("download", filename);
-              document.body.appendChild(link);
-              link.click();
-              document.body.removeChild(link);
-              URL.revokeObjectURL(link.href); // Clean up the URL object
-            })
-            .catch((error) => {
-              console.error("Download error:", error);
-              alert(`Error downloading ${filename}`);
-            });
-        };
-
         const videoFilename = extractFilename(data.video_url);
         const srtFilename = extractFilename(data.srt_url);
         const talkingSrtFilename = extractFilename(data.talking_srt_url);
 
         console.log("Video:", videoFilename);
         console.log("SRT:", srtFilename);
-        
-        
+
         downloadFile(data.video_url, videoFilename);
         downloadFile(data.srt_url, srtFilename);
         downloadFile(data.talking_srt_url, talkingSrtFilename);
-        
-        alert("Video and subtitles processing complete. Downloads started.");
+
+        setVideoDownloadUrl(data.video_url);
+        setSrtDownloadUrl(data.srt_url);
+        setTalkingSrtUrl(data.talking_srt_url);
+
+        showNotification(
+          "Success",
+          "Video and subtitles processing complete. Downloads started.",
+          "success"
+        );
       } else {
         const error = await response.json();
-        alert(`Error encoding video: ${error.error}`);
+        showNotification(
+          "Encoding Error",
+          "Error encoding the video.",
+          "error"
+        );
       }
     } catch (error) {
       console.error("Error encoding video:", error);
-      alert("Error connecting to the backend.");
-    }
-  };
-
-  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      setUploadedVideo(file);
-      setVideoName(file.name); // Set the video name
-      console.log("Uploaded Video:", file.name); // Log the file name
+      showNotification(
+        "Connection Error",
+        "Error connecting to the backend.",
+        "error"
+      );
     }
   };
 
   const handleGenerateDescriptions = async (): Promise<void> => {
     if (selectedScenes.size === 0) {
-      alert("Please select scenes to generate descriptions");
+      showNotification(
+        "No Selection",
+        "Please select scenes to generate descriptions",
+        "error"
+      );
       return;
     }
     if (!uploadedVideo || !uploadedVideo.name) {
-      alert(
-        "No video uploaded. Please upload a video before generating descriptions."
+      showNotification(
+        "Missing Video",
+        "Please upload a video before generating descriptions.",
+        "error"
       );
       return;
     }
@@ -1071,11 +893,17 @@ const Workspace3: React.FC = () => {
       // Update state with final descriptions
       setVideoDescriptions(updatedDescriptions);
       setPreviousDescriptions(updatedDescriptions);
-      alert("Descriptions updated successfully!");
+      showNotification(
+        "Success",
+        "Descriptions updated successfully!",
+        "success"
+      );
     } catch (error) {
       console.error("Description generation error:", error);
-      alert(
-        `Error: ${error instanceof Error ? error.message : "Unknown error"}`
+      showNotification(
+        "Error",
+        error instanceof Error ? error.message : "Unknown error",
+        "error"
       );
     } finally {
       // Always set processing state to false
@@ -1087,6 +915,22 @@ const Workspace3: React.FC = () => {
 
   const toggleSlideInModal = () => {
     setIsSlideInModalOpen(!isSlideInModalOpen);
+  };
+
+  const downloadAll = () => {
+    if (videoDownloadUrl && srtDownloadUrl && talkingSrtUrl) {
+      downloadFile(videoDownloadUrl, extractFilename(videoDownloadUrl));
+      downloadFile(srtDownloadUrl, extractFilename(srtDownloadUrl));
+      downloadFile(talkingSrtUrl, extractFilename(talkingSrtUrl));
+      return;
+    } else if (!videoDownloadUrl || !srtDownloadUrl || !talkingSrtUrl) {
+      showNotification(
+        "Missing Files",
+        "Please generate descriptions and audio files first.",
+        "error"
+      );
+      return;
+    }
   };
 
   return (
@@ -1113,8 +957,26 @@ const Workspace3: React.FC = () => {
           onGenerateDescriptions={handleGenerateDescriptions}
           onRegenerateAudio={handleRegenerateAudio}
           videoFile={videoFile}
+          setVideoFile={setVideoFile}
         />
-
+        {notification && (
+          <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 max-w-md animate-in fade-in slide-in-from-top-2">
+            <Alert
+              variant={
+                notification.type === "error" ? "destructive" : "default"
+              }
+              className={`
+        ${notification.type === "success" && "border-green-500 text-green-500"}
+        ${
+          notification.type === "warning" && "border-yellow-500 text-yellow-500"
+        }
+      `}
+            >
+              <AlertTitle>{notification.title}</AlertTitle>
+              <AlertDescription>{notification.message}</AlertDescription>
+            </Alert>
+          </div>
+        )}
         {/* SRT Upload Modal */}
         <Dialog open={isSrtModalOpen} onOpenChange={setIsSrtModalOpen}>
           <DialogContent className="bg-gray-900 p-8 rounded-xl shadow-2xl max-w-md w-full border border-gray-700">
@@ -1208,6 +1070,14 @@ const Workspace3: React.FC = () => {
               onClick={toggleSrtModal}
             >
               <Upload className="w-6 h-6" />
+            </Button>
+            <Button
+              variant="default"
+              className="p-3 rounded-full shadow-md hover:bg-blue-600 transition"
+              onClick={downloadAll}
+              disabled={!videoDownloadUrl || !srtDownloadUrl || !talkingSrtUrl}
+            >
+              <Download className="w-6 h-6" />
             </Button>
           </div>
         </div>

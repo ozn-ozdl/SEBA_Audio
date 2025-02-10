@@ -356,97 +356,6 @@ def analyze_timestamps():
         return jsonify({"error": f"Processing error: {str(e)}"}), 500
 
 
-
-
-# @app.route("/encode-video-with-subtitles", methods=["POST"])
-# def encode_video_with_subtitles():
-#     try:
-#         data = request.get_json()
-#         # Validate required fields
-#         required_fields = ['descriptions', 'timestamps', 'audioFiles', 'videoFileName']
-#         for field in required_fields:
-#             if field not in data or not data[field]:
-#                 return jsonify({"error": f"Missing {field}"}), 400
-
-#         # Process segments with millisecond timestamps
-#         filtered_segments = []
-#         audio_index = 0
-#         for i, (desc, (start, end)) in enumerate(zip(data['descriptions'], data['timestamps'])):
-#             if desc.strip().upper() != "TALKING":
-#                 audio_file = data['audioFiles'][audio_index]
-#                 audio_index += 1
-                
-#                 filtered_segments.append({
-#                     "start": start,
-#                     "end": end,
-#                     "audio": audio_file,
-#                     "description": desc
-#                 })
-
-#         # Generate SRT from milliseconds
-#         srt_content = []
-#         for i, seg in enumerate(filtered_segments, 1):
-#             start_srt = milliseconds_to_srt_time(seg["start"])
-#             end_srt = milliseconds_to_srt_time(seg["end"])
-#             srt_content.append(f"{i}\n{start_srt} --> {end_srt}\n{seg['description']}\n")
-        
-#         # Audio processing with millisecond precision
-#         audio_clips = []
-#         start_times = []
-#         for seg in filtered_segments:
-#             # Handle audio duration matching
-#             duration_ms = seg["end"] - seg["start"]
-#             original_duration = get_audio_duration(seg["audio"]) * 1000
-            
-#             if original_duration > duration_ms:
-#                 speed_factor = original_duration / duration_ms
-#                 with tempfile.NamedTemporaryFile(suffix=".mp3", delete=False) as f:
-#                     temp_path = f.name
-#                 speed_up_audio(seg["audio"], speed_factor, temp_path)
-#                 audio_clips.append(temp_path)
-#             else:
-#                 audio_clips.append(seg["audio"])
-            
-#             start_times.append(seg["start"] / 1000)  # Convert ms to seconds
-
-#         # Generate output video
-#         output_filename = f"processed_{data['videoFileName']}"
-#         output_path = os.path.join(PROCESSED_FOLDER, output_filename)
-        
-#         # Create mixed audio and subtitle files
-#         mixed_audio_path = _create_mixed_audio(audio_clips, start_times)
-#         srt_file_path = _create_temp_file(srt_content)
-
-#         # FFmpeg command to include original audio and mixed audio as separate tracks
-#         subprocess.run([
-#             "ffmpeg", "-y",
-#             "-i", os.path.join(UPLOAD_FOLDER, data['videoFileName']),  # Original video
-#             "-i", mixed_audio_path,  # Mixed audio
-#             "-i", srt_file_path,  # Subtitles
-#             "-map", "0:v:0",  # Video from the first input
-#             "-map", "0:a:0",  # Original audio from the first input
-#             "-map", "1:a:0",  # Mixed audio from the second input
-#             "-map", "2:s:0",  # Subtitles from the third input
-#             "-c:v", "libx264", 
-#             "-c:a", "aac",
-#             "-c:s", "mov_text",  # Use mov_text for subtitles in MP4
-#             output_path
-#         ], check=True)
-
-#         # Read the SRT file content
-#         with open(srt_file_path, 'r') as f:
-#             srt_content = f.read()
-
-#         # Return both the video and the SRT file
-#         return jsonify({
-#             'video': send_file(output_path, mimetype='video/mp4'),
-#             'srt_content': srt_content
-#         })
-
-#     except Exception as e:
-#         return jsonify({"error": str(e)}), 500
-
-
 def milliseconds_to_srt_time(ms):
     seconds, milliseconds = divmod(ms, 1000)
     minutes, seconds = divmod(seconds, 60)
@@ -468,15 +377,20 @@ def encode_video_with_subtitles():
                 return jsonify({"error": f"Missing {field}"}), 400
 
         filtered_segments = []
-        talking_segments = []
+        combined_segments = []
         audio_index = 0
-        for i, (desc, (start, end)) in enumerate(zip(data["descriptions"], data["timestamps"])):
+        for i, (desc, (start, end)) in enumerate(
+            zip(data["descriptions"], data["timestamps"])
+        ):
+            segment = {"start": start, "end": end, "description": desc}
             if desc.strip().upper() == "TALKING":
-                talking_segments.append({"start": start, "end": end, "description": desc})
+                combined_segments.append(segment)
             else:
                 audio_file = data["audioFiles"][audio_index]
                 audio_index += 1
-                filtered_segments.append({"start": start, "end": end, "audio": audio_file, "description": desc})
+                segment["audio"] = audio_file
+                filtered_segments.append(segment)
+                combined_segments.append(segment)
 
         srt_content = []
         for i, seg in enumerate(filtered_segments, 1):
@@ -485,16 +399,69 @@ def encode_video_with_subtitles():
             srt_content.append(f"{i}\n{start_srt} --> {end_srt}\n{seg['description']}\n")
 
         talking_srt_content = []
-        for i, seg in enumerate(talking_segments, 1):
+        for i, seg in enumerate(combined_segments, 1):
             start_srt = milliseconds_to_srt_time(seg["start"])
             end_srt = milliseconds_to_srt_time(seg["end"])
-            talking_srt_content.append(f"{i}\n{start_srt} --> {end_srt}\n{seg['description']}\n")
+            talking_srt_content.append(
+                f"{i}\n{start_srt} --> {end_srt}\n{seg['description']}\n"
+            )
+
+        # Audio processing with millisecond precision
+        audio_clips = []
+        start_times = []
+        for seg in filtered_segments:
+            # Handle audio duration matching
+            duration_ms = seg["end"] - seg["start"]
+            original_duration = get_audio_duration(seg["audio"]) * 1000
+
+            if original_duration > duration_ms:
+                speed_factor = original_duration / duration_ms
+                with tempfile.NamedTemporaryFile(suffix=".mp3", delete=False) as f:
+                    temp_path = f.name
+                speed_up_audio(seg["audio"], speed_factor, temp_path)
+                audio_clips.append(temp_path)
+            else:
+                audio_clips.append(seg["audio"])
+
+            start_times.append(seg["start"] / 1000)  # Convert ms to seconds
 
         output_filename = f"processed_{data['videoFileName']}"
         output_path = os.path.join(PROCESSED_FOLDER, output_filename)
 
+        # Create mixed audio and subtitle files
+        mixed_audio_path = _create_mixed_audio(audio_clips, start_times)
         srt_file_path = _create_temp_file(srt_content)
         talking_srt_file_path = _create_temp_file(talking_srt_content)
+
+        # FFmpeg command to include original audio and mixed audio as separate tracks
+        subprocess.run(
+            [
+                "ffmpeg",
+                "-y",
+                "-i",
+                os.path.join(UPLOAD_FOLDER, data["videoFileName"]),  # Original video
+                "-i",
+                mixed_audio_path,  # Mixed audio
+                "-i",
+                srt_file_path,  # Subtitles
+                "-map",
+                "0:v:0",  # Video from the first input
+                "-map",
+                "0:a:0",  # Original audio from the first input
+                "-map",
+                "1:a:0",  # Mixed audio from the second input
+                "-map",
+                "2:s:0",  # Subtitles from the third input
+                "-c:v",
+                "libx264",
+                "-c:a",
+                "aac",
+                "-c:s",
+                "mov_text",  # Use mov_text for subtitles in MP4
+                output_path,
+            ],
+            check=True,
+        )
 
         unique_id = str(uuid.uuid4())[:8]
         video_name = os.path.splitext(data["videoFileName"])[0]
@@ -517,7 +484,13 @@ def encode_video_with_subtitles():
         srt_url = f"/download_srt/{os.path.basename(srt_filepath)}"
         talking_srt_url = f"/download_srt/{os.path.basename(talking_srt_filepath)}"
 
-        return jsonify({"video_url": video_url, "srt_url": srt_url, "talking_srt_url": talking_srt_url})
+        return jsonify(
+            {
+                "video_url": video_url,
+                "srt_url": srt_url,
+                "talking_srt_url": talking_srt_url,
+            }
+        )
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -565,7 +538,7 @@ def milliseconds_to_srt_time(ms):
     hours, ms = divmod(ms, 3600000)
     minutes, ms = divmod(ms, 60000)
     seconds, ms = divmod(ms, 1000)
-    return f"{hours:02d}:{minutes:02d}:{seconds:02d},{ms:03d}"
+    return f"{hours:02d}:{minutes:02d}:{seconds:02d},{ms:03fd}"
 
 def get_audio_duration(audio_file):
     """Get the duration of an audio file in seconds"""

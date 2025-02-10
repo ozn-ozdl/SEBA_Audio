@@ -42,6 +42,7 @@ interface VideoTimelineProps {
   onGenerateDescriptions: () => void;
   onRegenerateAudio: () => void;
   videoFile: File | null;
+  setVideoFile: (file: File | null) => void;
 }
 
 const buttonStyles = {
@@ -90,6 +91,7 @@ export const TranscriptionEditor: React.FC<VideoTimelineProps> = ({
   onRegenerateAudio,
   setVideoName,
   videoFile,
+  setVideoFile
 }) => {
   const [state, setState] = useState({
     isPlaying: false,
@@ -163,6 +165,7 @@ export const TranscriptionEditor: React.FC<VideoTimelineProps> = ({
     const file = event.target.files?.[0];
     if (file) {
       setUploadedVideo(file);
+      setVideoFile(file);
       setVideoName(file.name);
     }
   };

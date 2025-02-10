@@ -17,10 +17,12 @@ const calculateWPM = (startTime: number, endTime: number, text: string) => {
 };
 
 const getColorForWPM = (wpm: number) => {
-  const averageWPM = 130; // Slightly faster than average human WPM
-  if (wpm > averageWPM + 30) return "text-red-500"; // Very fast
+  const averageWPM = 160; // Slightly faster than average human WPM
+  const wpmRange = 40;
+  if (wpm > averageWPM + wpmRange) return "text-red-500"; // Very fast
   if (wpm > averageWPM) return "text-yellow-500"; // Fast
-  if (wpm < averageWPM - 30) return "text-red-500"; // Very slow
+  if (wpm < averageWPM) return "text-yellow-500"; // Good
+  if (wpm < averageWPM - wpmRange) return "text-red-500"; // Very slow
   return "text-green-500"; // Good
 };
 
