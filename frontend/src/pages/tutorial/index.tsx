@@ -1,5 +1,4 @@
 import React from "react";
-import faqimg from './faq.png';
 import dashboardimg from './Dashboard_Create.png';
 import editorimg from './Editor.png';
 import saveimg from './Save_EncodeVideo.png';
@@ -12,7 +11,8 @@ const TutorialPage: React.FC = () => {
       description: (
         <p>
           When you click <strong>Get Started for Free</strong> on the home page, 
-          you'll be redirected to the <strong>Dashboard</strong>.
+          you'll be redirected to the login page.
+          After successful login you will be taken to the <strong>Dashboard</strong>.
           This is your central hub where you'll find the project overview.
           <br />
           <br />
@@ -41,11 +41,13 @@ const TutorialPage: React.FC = () => {
       ),
     },
     {
-      title: "Step 4: View Results",
+      title: "Step 4: View & Edit Results",
       description: (
         <p>
-          Depending on the size of the uploaded video, you'll be delighted to see the timestamps 
-          and descriptions of what's happening in the video in just a few minutes!
+          Depending on the size of the uploaded video, 
+          the timestamps and corresponding scene descriptions will be generated within a few minutes. 
+          You can review and refine these descriptions by clicking on the scene blocks 
+          and making any necessary edits to ensure accuracy and clarity.
         </p>
       ),
     },
@@ -53,14 +55,13 @@ const TutorialPage: React.FC = () => {
       title: "Step 5: More Tools",
       description: (
         <p>
-          Hit the Play icon to check if the generated descriptions match the actual content.
+          Click the Play icon to verify that the generated descriptions accurately reflect the video content.
           <br />
           <br />
-          You can save your work whenever you want in the bottom right corner.
+          You can save your progress at any time using the save option in the bottom right corner.
           <br />
           <br />
-          You can also use <strong>Regenerate</strong> and the other tools, such as adding new scenes, 
-          to make the work fit your needs.
+          Additionally, you can use the <strong>Regenerate</strong> feature and other editing tools—such as adding new scenes by clicking the plus symbol on the timeline—to customize the results to your needs.
         </p>
       ),
     },
@@ -78,13 +79,12 @@ const TutorialPage: React.FC = () => {
   return (
     <div className="min-h-screen bg-gray-50 text-gray-900 flex flex-col">
       {/* Header */}
-      <header className="w-full py-6 px-8 flex justify-between items-center ">
+      <header className="w-full py-6 px-8 flex justify-between items-center">
         <h1 className="text-2xl font-bold text-gray-800">NarrifAI</h1>
       </header>
 
       {/* Main Content */}
       <main className="flex-1 w-full px-4 sm:px-6 lg:px-8 py-16">
-        {/* Tutorial Intro */}
         <section className="flex flex-col items-center text-center mb-16">
           <h1 className="text-4xl sm:text-5xl font-bold leading-tight max-w-3xl mb-6">
             Getting Started: How to Use NarrifAI
@@ -95,10 +95,10 @@ const TutorialPage: React.FC = () => {
           </p>
         </section>
 
-        {/* Tutorial Steps */}
-        <section className="grid grid-cols-1 lg:grid-cols-2 gap-12 max-w-7xl mx-auto">
+        {/* Tutorial Steps & Screenshots */}
+        <section className="grid grid-cols-5 gap-12 max-w-7xl mx-auto">
           {/* Left: Steps */}
-          <div className="space-y-8">
+          <div className="col-span-2 space-y-8">
             {steps.map((step, index) => (
               <div key={index} className="bg-white p-8 rounded-lg shadow-lg hover:shadow-xl transition-shadow">
                 <h2 className="text-2xl font-bold text-indigo-600 mb-4">
@@ -110,28 +110,28 @@ const TutorialPage: React.FC = () => {
           </div>
 
           {/* Right: Screenshots */}
-          <div className="bg-white p-8 rounded-lg shadow-lg">
+          <div className="col-span-3 bg-white p-8 rounded-lg shadow-lg">
             <h3 className="text-2xl font-bold text-indigo-600 mb-6">
-              Screenshots
+              Interface Previews
             </h3>
             <div className="space-y-6">
-            <div className="bg-gray-100 h-96 rounded-lg flex flex-col items-center justify-center p-4 hover:shadow-xl transition-shadow">
-                <img src={dashboardimg} className="h-full w-full object-contain" />
+              <div className="bg-gray-100 h-[550px] rounded-lg flex flex-col items-center justify-center p-4 hover:shadow-xl transition-shadow">
+                <img src={dashboardimg} className="w-full h-auto object-cover" />
                 <p className="text-gray-700 mt-2 text-center">Step 1: Create Project</p>
               </div>
 
-              <div className="bg-gray-100 h-96 rounded-lg flex flex-col items-center justify-center p-4 hover:shadow-xl transition-shadow">
-                <img src={uploadimg} className="h-full object-contain" />
+              <div className="bg-gray-100 h-[550px] rounded-lg flex flex-col items-center justify-center p-4 hover:shadow-xl transition-shadow">
+                <img src={uploadimg} className="w-full h-auto object-cover" />
                 <p className="text-gray-700 mt-2 text-center">Step 2: Upload Your Video</p>
               </div>
 
-              <div className="bg-gray-100 h-96 rounded-lg flex flex-col items-center justify-center p-4 hover:shadow-xl transition-shadow">
-                <img src={editorimg} className="h-full w-full object-contain" />
+              <div className="bg-gray-100 h-[550px] rounded-lg flex flex-col items-center justify-center p-4 hover:shadow-xl transition-shadow">
+                <img src={editorimg} className="w-full h-auto object-cover" />
                 <p className="text-gray-700 mt-2 text-center">Step 3-4: View & Edit Video</p>
               </div>
 
-              <div className="bg-gray-100 h-96 rounded-lg flex flex-col items-center justify-center p-4 hover:shadow-xl transition-shadow">
-                <img src={saveimg} className="h-full w-full object-contain" />
+              <div className="bg-gray-100 h-[550px] rounded-lg flex flex-col items-center justify-center p-4 hover:shadow-xl transition-shadow">
+                <img src={saveimg} className="w-full h-auto object-cover" />
                 <p className="text-gray-700 mt-2 text-center">Step 5-6: Save & Export</p>
               </div>
             </div>

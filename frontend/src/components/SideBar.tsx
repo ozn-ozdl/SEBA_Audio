@@ -68,14 +68,14 @@ export function SideBar() {
                       Tutorial
                     </Link>
                   </li>
-                  <li>
+                  {/* <li>
                     <Link
                       to="/faq"
                       className="flex justify-center items-center hover:bg-gray-700 p-2 rounded"
                     >
                       FAQs
                     </Link>
-                  </li>
+                  </li> */}
                 </ul>
               )}
             </li>
@@ -90,7 +90,7 @@ export function SideBar() {
           className="flex justify-center items-center hover:bg-gray-700 p-2 rounded"
         >
           <Users className="mr-2" />
-          <span className="font-bold">Our Team & Contact</span>
+          <span className="font-bold">Our Team</span>
         </Link>
       </div>
     </div>
