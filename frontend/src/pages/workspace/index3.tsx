@@ -822,6 +822,7 @@ const Workspace3: React.FC = () => {
     }
 
     try {
+      showNotification("Encoding...", "Encoding video...", "success");
       const response = await fetch(
         "http://localhost:5000/encode-video-with-subtitles",
         {
