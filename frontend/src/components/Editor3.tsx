@@ -43,6 +43,8 @@ interface VideoTimelineProps {
   onRegenerateAudio: () => void;
   videoFile: File | null;
   setVideoFile: (file: File | null) => void;
+  isModalOpen: boolean;
+  setModalOpen: (isOpen: boolean) => void;
 }
 
 const buttonStyles = {
@@ -91,7 +93,9 @@ export const TranscriptionEditor: React.FC<VideoTimelineProps> = ({
   onRegenerateAudio,
   setVideoName,
   videoFile,
-  setVideoFile
+  setVideoFile,
+  isModalOpen,
+  setModalOpen,
 }) => {
   const [state, setState] = useState({
     isPlaying: false,
@@ -104,13 +108,20 @@ export const TranscriptionEditor: React.FC<VideoTimelineProps> = ({
     currentSubtitle: "",
     selectedScenes: new Set<number>(),
     isDescriptionsVisible: true,
-    isModalOpen: false,
     videoFile,
   });
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
   const animationRef = useRef<number | null>(null);
+  const [isVideoUploaded, setIsVideoUploaded] = React.useState(false);
+
+  useEffect(() => {
+    if (uploadedVideo) {
+      setIsVideoUploaded(true);
+    }
+  }, [uploadedVideo]);
+
 
   const updateState = (newState: Partial<typeof state>) => {
     setState((prev) => ({ ...prev, ...newState }));
@@ -193,7 +204,7 @@ export const TranscriptionEditor: React.FC<VideoTimelineProps> = ({
   const handleModalConfirm = async () => {
     const scenesToReanalyze = Array.from(selectedScenes);
     await handleReanalyzeVideo(scenesToReanalyze);
-    updateState({ isModalOpen: false });
+    setModalOpen(false);
   };
 
   return (
@@ -206,21 +217,21 @@ export const TranscriptionEditor: React.FC<VideoTimelineProps> = ({
       )}
 
       <SceneSelectionModal
-        isOpen={state.isModalOpen && !isProcessing}
+        isOpen={isModalOpen && !isProcessing}
         scenes={videoDescriptions}
         selectedScenes={selectedScenes} // From props
         onSelectScene={onSelectScene} // From props
         onSelectAll={onSelectAll} // From props
         onGenerateDescriptions={onGenerateDescriptions}
         onRegenerateAudio={onRegenerateAudio}
-        onClose={() => updateState({ isModalOpen: false })}
+        onClose={() => setModalOpen(false)}
       />
 
       <VideoHeader
         uploadedVideo={state.videoFile}
         onEncode={() => state.videoFile && handleEncodeVideo(state.videoFile)}
         onAnalyze={analyzeVideo}
-        onReanalyze={() => updateState({ isModalOpen: true })}
+        onReanalyze={() => setModalOpen(true)}
         onRegenerateAudio={handleRegenerateAudio}
         videoDescriptions={videoDescriptions}
       />
@@ -235,6 +246,8 @@ export const TranscriptionEditor: React.FC<VideoTimelineProps> = ({
             onSceneSelect={(startTime) =>
               updateState({ selectedScene: startTime })
             }
+            onReanalyze={() => setModalOpen(true)}
+            isVideoUploaded={isVideoUploaded}
           />
         )}
 

@@ -27,9 +27,7 @@ import tempfile
 import traceback
 import openAI_images.revisedGemini as rg
 
-
 from uuid import uuid4
-
 
 app = Flask(__name__)
 app.config['MAX_CONTENT_LENGTH'] = 30 * 1024 * 1024
@@ -51,6 +49,12 @@ os.makedirs(TRIMMED_FOLDER, exist_ok=True)
 os.makedirs(SRT_FOLDER, exist_ok=True)
 
 def setup():
+    """
+    Setup required directories for video processing.
+
+    This function ensures that the upload folder exists and recreates the frames, scenes, 
+    and waveform folders by deleting any existing ones and creating new directories.
+    """
     os.makedirs(UPLOAD_FOLDER, exist_ok=True)
     if os.path.exists(FRAMES_FOLDER):
         shutil.rmtree(FRAMES_FOLDER)
@@ -63,14 +67,38 @@ def setup():
 
 @app.route("/")
 def hello_geek():
+    """
+    Basic endpoint to verify server connectivity.
+
+    Returns:
+        str: A simple HTML greeting.
+    """
     return "<h1>Hello from Flask & Docker</h1>"
 
 @app.route("/scene_files/<path:filename>", methods=["GET"])
 def get_scene_files(filename):
+    """
+    Serve a scene file from the scenes results folder.
+
+    Args:
+        filename (str): The name of the scene file.
+
+    Returns:
+        Response: The file served from the SCENES_FOLDER.
+    """
     return send_from_directory(SCENES_FOLDER, filename)
 
 @app.route("/audio/<path:filename>", methods=["GET"])
 def get_audio_files(filename):
+    """
+    Serve an audio file from the audio folder.
+
+    Args:
+        filename (str): The name of the audio file.
+
+    Returns:
+        Response: The requested audio file or an error response if not found.
+    """
     try:
         filepath = os.path.join(AUDIO_FOLDER, filename)
         print(filepath)
@@ -86,6 +114,15 @@ def get_audio_files(filename):
 
 @app.route("/regenerate-audio", methods=["POST"])
 def regenerate_audio():
+    """
+    Regenerate audio files for video scenes using text-to-speech.
+
+    This endpoint accepts a JSON payload with 'scenes' and 'video_name', generates audio files 
+    for each scene description, and streams progress updates in NDJSON format.
+
+    Returns:
+        Response: A streaming response with progress updates and audio file details.
+    """
     def generate():
         try:
             data = request.get_json()
@@ -145,6 +182,15 @@ def regenerate_audio():
 
 @app.route("/regenerate-descriptions", methods=["POST"])
 def regenerate_descriptions():
+    """
+    Regenerate scene descriptions for a video.
+
+    This endpoint validates input, generates a video summary, extracts video segments, 
+    generates new scene descriptions using Gemini, and streams progress updates.
+
+    Returns:
+        Response: A streaming response in NDJSON format with progress updates and final description data.
+    """
     def generate():
         try:
             # Initial setup and validation
@@ -237,10 +283,17 @@ def regenerate_descriptions():
 
     return Response(stream_with_context(generate()), mimetype="application/x-ndjson")
 
-
-
 @app.route("/text-to-speech", methods=["POST"])
 def text_to_speech():
+    """
+    Convert a list of scene descriptions to speech.
+
+    This endpoint expects a JSON array where each item contains a description, timestamps, 
+    and a scene ID. It generates audio files for each description and returns the audio file paths.
+
+    Returns:
+        Response: JSON response containing a list of audio file information.
+    """
     try:
         data = request.get_json()
         if not data or not isinstance(data, list):
@@ -273,10 +326,17 @@ def text_to_speech():
         print("Error generating audio:", traceback.format_exc())
         return jsonify({"error": f"Failed to generate audio: {str(e)}"}), 500
 
-
-# Update timestamp processing in analyze-timestamps route
 @app.route("/analyze-timestamps", methods=["POST"])
 def analyze_timestamps():
+    """
+    Analyze and process video timestamps.
+
+    This endpoint compares the old timestamps with new timestamps, processes the changed segments, 
+    generates descriptions for them, and merges the results with the existing descriptions.
+
+    Returns:
+        Response: JSON response with the final merged descriptions and a waveform image path.
+    """
     print("Analyzing timestamps")
     try:
         # Get data as JSON
@@ -357,18 +417,45 @@ def analyze_timestamps():
 
 
 def milliseconds_to_srt_time(ms):
+    """
+    Convert milliseconds to SRT timestamp format.
+
+    Args:
+        ms (int): Time in milliseconds.
+
+    Returns:
+        str: A timestamp string formatted as "HH:MM:SS,mmm".
+    """
     seconds, milliseconds = divmod(ms, 1000)
     minutes, seconds = divmod(seconds, 60)
     hours, minutes = divmod(minutes, 60)
     return f"{hours:02}:{minutes:02}:{seconds:02},{milliseconds:03}"
 
 def _create_temp_file(content_list):
+    """
+    Create a temporary SRT file with the provided content.
+
+    Args:
+        content_list (list): A list of strings representing the lines of the SRT file.
+
+    Returns:
+        str: The path to the created temporary SRT file.
+    """
     with tempfile.NamedTemporaryFile(delete=False, suffix=".srt", mode="w") as temp_file:
         temp_file.write("\n".join(content_list))
         return temp_file.name
 
 @app.route("/encode-video-with-subtitles", methods=["POST"])
 def encode_video_with_subtitles():
+    """
+    Encode a video by merging audio tracks and embedding subtitles.
+
+    This endpoint processes the provided video, audio files, and subtitle data to generate a final
+    processed video file with embedded subtitles. It returns URLs for the processed video and SRT files.
+
+    Returns:
+        Response: A JSON response containing download URLs for the processed video, SRT file, and talking SRT file.
+    """
     try:
         data = request.get_json()
         required_fields = ["descriptions", "timestamps", "audioFiles", "videoFileName"]
@@ -496,6 +583,15 @@ def encode_video_with_subtitles():
 
 @app.route("/download_video/<filename>")
 def download_video(filename):
+    """
+    Download the processed video file.
+
+    Args:
+        filename (str): The name of the processed video file.
+
+    Returns:
+        Response: A Flask response for downloading the video file.
+    """
     filepath = os.path.join(PROCESSED_FOLDER, filename)
     if not os.path.exists(filepath):
         return "Video file not found", 404
@@ -505,12 +601,30 @@ def download_video(filename):
 
 @app.route("/download_srt/<filename>")
 def download_srt(filename):
+    """
+    Download the SRT subtitle file.
+
+    Args:
+        filename (str): The name of the SRT file.
+
+    Returns:
+        Response: A Flask response for downloading the SRT file.
+    """
     response = make_response(send_from_directory(SRT_FOLDER, filename, as_attachment=True))
     response.headers['Content-Disposition'] = f'attachment; filename="{filename}"'
     return response
 
 def _create_mixed_audio(audio_files, start_times):
-    """Mix audio clips at specific millisecond start times"""
+    """
+    Mix multiple audio clips with specified start delays using FFmpeg.
+
+    Args:
+        audio_files (list): List of audio file paths.
+        start_times (list): List of start times (in seconds) for each audio clip.
+
+    Returns:
+        str: The path to the mixed audio file.
+    """
     inputs = []
     filter_chains = []
     
@@ -533,43 +647,16 @@ def _create_mixed_audio(audio_files, start_times):
     ], check=True)
     return output
 
-def milliseconds_to_srt_time(ms):
-    """Convert milliseconds to SRT format (HH:MM:SS,mmm)"""
-    hours, ms = divmod(ms, 3600000)
-    minutes, ms = divmod(ms, 60000)
-    seconds, ms = divmod(ms, 1000)
-    return f"{hours:02d}:{minutes:02d}:{seconds:02d},{ms:03fd}"
-
-def get_audio_duration(audio_file):
-    """Get the duration of an audio file in seconds"""
-    result = subprocess.run(
-        ["ffprobe", "-v", "error", "-show_entries", "format=duration",
-         "-of", "default=noprint_wrappers=1:nokey=1", audio_file],
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE
-    )
-    return float(result.stdout)
-
-def speed_up_audio(audio_file, speed_factor, output_file):
-    """Speed up audio by a given factor"""
-    subprocess.run([
-        "ffmpeg", "-y", "-i", audio_file,
-        "-filter:a", f"atempo={speed_factor}",
-        output_file
-    ], check=True)
-
-def _create_temp_file(srt_content):
-    """Create a temporary file for SRT content"""
-    srt_file = tempfile.NamedTemporaryFile(suffix=".srt", delete=False)
-    with open(srt_file.name, 'w') as f:
-        f.writelines(srt_content)
-    return srt_file.name
-
-
-
-
 @app.route("/get-video", methods=["GET"])
 def get_video():
+    """
+    Retrieve a video file for download.
+
+    This endpoint returns the specified video file from the uploads folder.
+
+    Returns:
+        Response: A Flask response for downloading the video file.
+    """
     video_name = request.args.get("videoName")
     if not video_name:
         return jsonify({"error": "Video name is required"}), 400
@@ -593,9 +680,15 @@ def get_video():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-        
+
 @app.route("/check-video", methods=["GET"])
 def check_video():
+    """
+    Check if a video file exists on the server.
+
+    Returns:
+        JSON: A JSON response indicating whether the video exists.
+    """
     video_name = request.args.get("videoName")
     if not video_name:
         return jsonify({"error": "Video name is required"}), 400
@@ -608,6 +701,14 @@ def check_video():
     
 @app.route("/process-video", methods=["POST"])
 def process_video():
+    """
+    Process an uploaded video to extract scenes, generate descriptions, and produce a processed video with subtitles and mixed audio.
+
+    This endpoint handles video upload, processing, and returns progress updates via a streaming response.
+    
+    Returns:
+        Response: A streaming JSON response with progress updates.
+    """
     print("Processing video request received")
 
     # Check if video file is present
@@ -626,7 +727,12 @@ def process_video():
     print(f"Processing video: {video_path} with action: {action}")
 
     def generate():
-        """Generator function to yield progress updates"""
+        """
+        Generator function to yield progress updates during video processing.
+
+        Yields:
+            str: JSON-formatted progress updates.
+        """
         try:
             if action != "new_gemini":
                 yield json.dumps({"error": "Invalid action specified"}) + "\n"
@@ -697,7 +803,17 @@ def process_video():
     return Response(stream_with_context(generate()), mimetype="application/x-ndjson")
 
 def speed_up_audio(input_path, speed_factor, output_path):
-    """Speed up audio using ffmpeg's atempo filter with chaining for factors > 2.0"""
+    """
+    Speed up an audio file using FFmpeg's atempo filter with chaining for factors > 2.0.
+
+    Args:
+        input_path (str): Path to the input audio file.
+        speed_factor (float): The factor by which to speed up the audio.
+        output_path (str): The path where the output audio file will be saved.
+
+    Returns:
+        None
+    """
     if speed_factor < 1.0:
         raise ValueError("Speed factor must be >= 1.0")
     
@@ -724,7 +840,15 @@ def speed_up_audio(input_path, speed_factor, output_path):
     ], check=True)
 
 def get_audio_duration(file_path):
-    """Get audio duration in seconds using ffprobe"""
+    """
+    Get the duration of an audio file in seconds using ffprobe.
+
+    Args:
+        file_path (str): Path to the audio file.
+
+    Returns:
+        float: Duration of the audio in seconds.
+    """
     cmd = [
         "ffprobe",
         "-v", "error",
@@ -737,28 +861,45 @@ def get_audio_duration(file_path):
         raise RuntimeError(f"Failed to get audio duration: {result.stderr}")
     return float(result.stdout.strip())
 
-def milliseconds_to_srt_time(ms):
-    """Convert milliseconds to SRT timestamp format (HH:MM:SS,mmm)"""
-    ms = int(ms)
-    hours = ms // 3600000
-    ms %= 3600000
-    minutes = ms // 60000
-    ms %= 60000
-    seconds = ms // 1000
-    milliseconds = ms % 1000
-    return f"{hours:02d}:{minutes:02d}:{seconds:02d},{milliseconds:03d}"
 
 def timestamp_to_seconds(ms):
-    """Convert milliseconds timestamp to total seconds"""
+    """
+    Convert milliseconds to seconds.
+
+    Args:
+        ms (int): Time in milliseconds.
+
+    Returns:
+        float: Time in seconds.
+    """
     return ms / 1000.0
 
 # Helper functions remain unchanged
 def create_temp_file(content, suffix):
+    """
+    Create a temporary file with the given content.
+
+    Args:
+        content (str): Content to write to the file.
+        suffix (str): Suffix for the temporary file (e.g., ".srt").
+
+    Returns:
+        str: Path to the created temporary file.
+    """
     with tempfile.NamedTemporaryFile(mode="w", suffix=suffix, delete=False) as f:
         f.write(content)
         return f.name
 
 def cleanup_temp_files(paths):
+    """
+    Delete temporary files specified by their paths.
+
+    Args:
+        paths (list): List of file paths to delete.
+
+    Returns:
+        None
+    """
     for path in paths:
         try:
             if path and os.path.exists(path):
@@ -767,6 +908,17 @@ def cleanup_temp_files(paths):
             pass
 
 def combine_audio_with_delays(audio_files, seconds_list, output_file):
+    """
+    Combine multiple audio files with specified delay offsets using FFmpeg.
+
+    Args:
+        audio_files (list): List of audio file paths.
+        seconds_list (list): List of delay values (in seconds) for each audio file.
+        output_file (str): Path where the combined audio file will be saved.
+
+    Returns:
+        None
+    """
     if len(audio_files) != len(seconds_list):
         raise ValueError("The number of audio files must match the number of delay values.")
 
@@ -787,7 +939,16 @@ def combine_audio_with_delays(audio_files, seconds_list, output_file):
     ], check=True)
 
 def generate_srt_file(descriptions, timestamps):
-    """Generate SRT file content from descriptions and timestamps."""
+    """
+    Generate SRT file content from descriptions and timestamps.
+
+    Args:
+        descriptions (list): List of subtitle texts.
+        timestamps (list): List of tuples with start and end timestamps.
+
+    Returns:
+        str: SRT file content as a string.
+    """
     srt_content = []
     for i, (description, (start, end)) in enumerate(zip(descriptions, timestamps), start=1):
         srt_content.append(f"{i}")

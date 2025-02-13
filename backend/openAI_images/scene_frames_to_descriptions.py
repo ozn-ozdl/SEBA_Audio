@@ -10,6 +10,15 @@ client = OpenAI(api_key=OPENAI_API_KEY)
 
 
 def generate_image_description_with_openai(image_path):
+    """
+    Generate a concise description for an image using OpenAI's chat completion API.
+
+    Args:
+        image_path (str): Path to the image file.
+
+    Returns:
+        str: A short, concise description generated for the image.
+    """
     with open(image_path, "rb") as image_file:
         import base64
         image_data = base64.b64encode(image_file.read()).decode("utf-8")
@@ -36,6 +45,15 @@ def generate_image_description_with_openai(image_path):
 
 
 def summarize_descriptions_with_openai(descriptions):
+    """
+    Summarize multiple image descriptions into one concise sentence for an audio description.
+
+    Args:
+        descriptions (list): List of individual image description strings.
+
+    Returns:
+        str: A summarized, concise sentence combining the input descriptions.
+    """
     prompt = (
         "Summarize the following image descriptions into one short, concise sentence that can be used as an audio description for visually impaired individuals: \n\n"
         + "\n".join([f"- {desc}" for desc in descriptions])
@@ -52,12 +70,33 @@ def summarize_descriptions_with_openai(descriptions):
 
 
 def numeric_sort_key(filename):
+    """
+    Extract a numeric sort key from a filename based on a frame number.
+
+    Args:
+        filename (str): The filename containing a frame number.
+
+    Returns:
+        int: The extracted frame number used as the sort key.
+    """
     basename = os.path.basename(filename)
     frame_number = int(basename.split("_")[1].split(".")[0])
     return frame_number
 
 
 def describe_scenes_with_openai(scene_changes, frames_dir):
+    """
+    Generate scene descriptions by processing image frames based on scene change boundaries.
+
+    Args:
+        scene_changes (list): List of filenames indicating scene change boundaries.
+        frames_dir (str): Directory path containing frame images (JPEG files).
+
+    Returns:
+        tuple: A tuple containing:
+            - list: A list of summarized scene descriptions.
+            - list: A list of lists, where each sublist contains frame filenames for that scene.
+    """
     scene_frames = []
     frames = sorted(
         [f for f in os.listdir(frames_dir) if f.endswith(".jpg")], key=numeric_sort_key

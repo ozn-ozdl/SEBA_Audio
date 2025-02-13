@@ -31,7 +31,7 @@ const LandingPage: React.FC = () => {
           <video
             controls
             className="w-full h-auto rounded-lg shadow-lg"
-            src="/demo/30_seconds_test_video.mp4"
+            src="/demo/30_seconds_test_video_speed.mp4"
           >
             Your browser does not support the video tag.
           </video>
@@ -41,11 +41,13 @@ const LandingPage: React.FC = () => {
           ... Into this
         </h2>
         <div className="w-full max-w-3xl mx-auto">
-          <img
-            src="/demo/visualization.png"
-            alt="Audio description visualization"
+          <video
+            controls
             className="w-full h-auto rounded-lg shadow-lg"
-          />
+            src="/demo/processed_30_seconds_test_video.mp4"
+          >
+            Your browser does not support the video tag.
+          </video>
         </div>
       </section>
 

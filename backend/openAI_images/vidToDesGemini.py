@@ -10,6 +10,15 @@ from openai import OpenAI
 
 
 def get_video_duration(video_path):
+    """
+    Retrieve the duration of a video using ffmpeg.
+
+    Args:
+        video_path (str): Path to the input video file.
+
+    Returns:
+        str or None: The duration of the video (e.g., "00:03:15.24") if found; otherwise, None.
+    """
     result = subprocess.run(['ffmpeg', '-i', video_path],
                             stderr=subprocess.PIPE, stdout=subprocess.PIPE)
     output = result.stderr.decode('utf-8')
@@ -29,6 +38,16 @@ model = genai.GenerativeModel("gemini-1.5-flash")
 
 
 def calculate_timestamp(frame, frame_rate):
+    """
+    Calculate the timestamp for a video frame based on its filename and the video's frame rate.
+
+    Args:
+        frame (str): Filename of the frame, expected to include the frame number (e.g., "frame_123.jpg").
+        frame_rate (float): The frame rate of the video.
+
+    Returns:
+        str: Timestamp in the format "HH:MM:SS".
+    """
     frame_number = int(frame.split('_')[1].split('.')[0])
     total_seconds = frame_number / frame_rate
 
@@ -37,13 +56,22 @@ def calculate_timestamp(frame, frame_rate):
     minutes = int((total_seconds % 3600) // 60)
     seconds = int(total_seconds % 60)
 
-    # return format as timestamps
     return f"{hours:02}:{minutes:02}:{seconds:02}"
 
 
 def generate_video_description_with_gemini(video_file_path):
-    # Upload the video and print a confirmation.
+    """
+    Generate a description for a video scene by transcribing audio and providing visual descriptions using Gemini.
 
+    Args:
+        video_file_path (str): Path to the video file.
+
+    Returns:
+        str: The generated description text.
+
+    Raises:
+        ValueError: If the video upload fails.
+    """
     video_file = genai.upload_file(path=video_file_path)
     while video_file.state.name == "PROCESSING":
         print('.', end='')
@@ -54,20 +82,29 @@ def generate_video_description_with_gemini(video_file_path):
         raise ValueError(video_file.state.name)
 
     print(f"Completed upload: {video_file.uri}")
-    # Create the prompt.
     prompt = "Transcribe the audio from this video. Provide visual descriptions without timestamps for any salient events in the video"
-
-    # Choose a Gemini model.
     model = genai.GenerativeModel(model_name="gemini-1.5-flash")
-
-    # Make the LLM request.
     response = model.generate_content([video_file, prompt],
                                       request_options={"timeout": 600})
     return response.text
 
 
 def split_video_by_scene_changes(scene_changes, frames_dir, frame_rate, video_file, output_dir):
-    """Split video by changing scenes and save to output_dir"""
+    """
+    Split a video into scenes based on scene change frames and save each scene as a separate video file.
+
+    Args:
+        scene_changes (list): List of frame filenames indicating scene change boundaries.
+        frames_dir (str): Directory containing extracted frame images.
+        frame_rate (float): The frame rate of the video.
+        video_file (str): Path to the original video file.
+        output_dir (str): Directory where the split scene video files will be saved.
+
+    Returns:
+        tuple: A tuple containing:
+            - list: Output video file paths for each scene.
+            - list: Corresponding timestamp tuples (start_timestamp, end_timestamp) for each scene.
+    """
     scene_frames = []
     frames = sorted(
         [f for f in os.listdir(frames_dir) if f.endswith(".jpg")], key=numeric_sort_key
@@ -114,7 +151,21 @@ def split_video_by_scene_changes(scene_changes, frames_dir, frame_rate, video_fi
 
 
 def describe_scenes_with_gemini_video(video_file, scene_changes, frames_dir, frame_rate, output_dir):
-    """Encapsulates the entire video segmentation and transcription description process"""
+    """
+    Split a video into scenes based on scene changes and generate a description for each scene using Gemini.
+
+    Args:
+        video_file (str): Path to the original video file.
+        scene_changes (list): List of frame filenames indicating scene change boundaries.
+        frames_dir (str): Directory containing extracted frame images.
+        frame_rate (float): The frame rate of the video.
+        output_dir (str): Directory where the split scene video files will be saved.
+
+    Returns:
+        tuple: A tuple containing:
+            - list: Generated scene descriptions.
+            - list: Timestamp tuples (start_timestamp, end_timestamp) for each scene.
+    """
     # 1. Split the vid
 
     split_video_files, timestamps = split_video_by_scene_changes(
@@ -129,6 +180,18 @@ def describe_scenes_with_gemini_video(video_file, scene_changes, frames_dir, fra
 
 
 def describe_with_gemini_whole_video(video_path):
+    """
+    Generate a full transcription and scene description for an entire video using Gemini.
+
+    Args:
+        video_path (str): Path to the video file.
+
+    Returns:
+        str: The transcription and scene description text.
+
+    Raises:
+        ValueError: If the video upload fails.
+    """
     video_file = genai.upload_file(path=video_path)
     print(video_path)
     while video_file.state.name == "PROCESSING":

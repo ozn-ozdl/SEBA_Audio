@@ -64,9 +64,9 @@ interface ProjectData {
   date: string;
   videoName: string;
   screenshot?: string;
-  videoUrl?: string;
-  srtUrl?: string;
-  audioUrl?: string;
+  videoUrl: string | null;
+  srtUrl: string | null;
+  audioUrl: string | null;
 }
 
 const Workspace3: React.FC = () => {
@@ -101,6 +101,7 @@ const Workspace3: React.FC = () => {
   const [videoDownloadUrl, setVideoDownloadUrl] = useState<string | null>(null);
   const [srtDownloadUrl, setSrtDownloadUrl] = useState<string | null>(null);
   const [talkingSrtUrl, setTalkingSrtUrl] = useState<string | null>(null);
+  const [isModalOpen, setModalOpen] = useState(false);
 
   const backendBaseUrl = "http://localhost:5000"; // Replace if different
   // Add to Workspace3 component:
@@ -120,33 +121,53 @@ const Workspace3: React.FC = () => {
     setTimeout(() => setNotification(null), 3000);
   };
 
+  // useEffect(() => {
+  //   // Load data from local storage if available
+  //   if (!hasLoadedInitialData) {
+  //     const storedProject = videoDescriptionsStorage?.find(
+  //       (item) => item.name === projectName
+  //     );
+
+  //     console.log("storedProject:", storedProject);
+  //     console.log("loading from storage");
+
+  //     if (storedProject) {
+  //       // Check if the stored data is different from the current state
+  //       if (
+  //         JSON.stringify(storedProject.data) !==
+  //         JSON.stringify(videoDescriptions)
+  //       ) {
+  //         setVideoDescriptions(storedProject.data);
+  //       }
+  //       setVideoName(storedProject.videoName);
+  //       if (!uploadedVideo && !hasFetchedVideo) {
+  //         fetchVideoFile(storedProject.videoName);
+  //         setHasFetchedVideo(true);
+  //       }
+  //     }
+  //     setHasLoadedInitialData(true); // Set the flag to true after loading
+  //   }
+  // }, [projectName, videoDescriptionsStorage, hasLoadedInitialData]); // Removed uploadedVideo and hasFetchedVideo
+
   useEffect(() => {
-    // Load data from local storage if available
+    // Only load data from storage on initial mount
     if (!hasLoadedInitialData) {
       const storedProject = videoDescriptionsStorage?.find(
         (item) => item.name === projectName
       );
 
-      console.log("storedProject:", storedProject);
-      console.log("loading from storage");
-
-      if (storedProject) {
-        // Check if the stored data is different from the current state
-        if (
-          JSON.stringify(storedProject.data) !==
-          JSON.stringify(videoDescriptions)
-        ) {
-          setVideoDescriptions(storedProject.data);
-        }
+      if (storedProject && videoDescriptions.length === 0) {
+        // Only load if descriptions are empty
+        setVideoDescriptions(storedProject.data);
         setVideoName(storedProject.videoName);
         if (!uploadedVideo && !hasFetchedVideo) {
           fetchVideoFile(storedProject.videoName);
           setHasFetchedVideo(true);
         }
       }
-      setHasLoadedInitialData(true); // Set the flag to true after loading
+      setHasLoadedInitialData(true);
     }
-  }, [projectName, videoDescriptionsStorage, hasLoadedInitialData]); // Removed uploadedVideo and hasFetchedVideo
+  }, [projectName, videoDescriptionsStorage, hasLoadedInitialData]);
 
   const fetchVideoFile = async (videoName: string) => {
     try {
@@ -195,18 +216,17 @@ const Workspace3: React.FC = () => {
   };
 
   const parseSrtFile = (srtText: string): VideoDescriptionItem[] => {
-    // Split by double newline to separate entries
-    const entries = srtText.trim().split("\n\n");
+    const entries = srtText.trim().split(/\n\s*\n/);
 
     return entries
-      .map((entry) => {
+      .map((entry): VideoDescriptionItem | null => {
+        // Explicitly type the map's return
         const lines = entry.split("\n");
-        // Skip the index number (first line)
+        if (lines.length < 2) return null;
+
         const timeLine = lines[1];
-        // Join remaining lines as description
         const description = lines.slice(2).join(" ").trim();
 
-        // Extract timestamps
         const [startTime, endTime] = timeLine.split(" --> ");
 
         return {
@@ -216,9 +236,7 @@ const Workspace3: React.FC = () => {
           isEdited: true,
         };
       })
-      .filter(
-        (item) => item.startTime >= 0 && item.endTime > 0 && item.description
-      );
+      .filter((item): item is VideoDescriptionItem => item !== null); // Type guard for filtering
   };
 
   const handleSrtFileUpload = useCallback(
@@ -230,11 +248,15 @@ const Workspace3: React.FC = () => {
 
         reader.onload = (e) => {
           const srtText = e.target?.result as string;
-          const newVideoDescriptionItems = parseSrtFile(srtText);
-
-          // Update the videoDescriptions state
-          setVideoDescriptions(newVideoDescriptionItems);
-          setIsSrtModalOpen(false); // Close the modal after upload
+          try {
+            // Add a try-catch block for parsing errors
+            const newVideoDescriptionItems = parseSrtFile(srtText);
+            setVideoDescriptions(newVideoDescriptionItems);
+            setIsSrtModalOpen(false);
+          } catch (error) {
+            console.error("Error parsing SRT file:", error);
+            showNotification("Error", "Invalid SRT file format.", "error"); // More specific error message
+          }
         };
 
         reader.onerror = () => {
@@ -244,9 +266,8 @@ const Workspace3: React.FC = () => {
         reader.readAsText(file);
       }
     },
-    [parseSrtFile, setVideoDescriptions, setIsSrtModalOpen]
+    [parseSrtFile, setVideoDescriptions, setIsSrtModalOpen, showNotification] // Add showNotification to the dependency array
   );
-
   const toggleSrtModal = () => {
     setIsSrtModalOpen(!isSrtModalOpen);
   };
@@ -432,19 +453,30 @@ const Workspace3: React.FC = () => {
             .map((item) => [`${item.startTime}-${item.endTime}`, item])
         );
 
-        const mergedDescriptions = [
-          ...result.descriptions.map((desc: any) => ({
-            startTime: desc.start,
-            endTime: desc.end,
-            description: desc.description,
-            audioFile: desc.audioFile,
-            isEdited: true, // New items from analysis
-          })),
-          ...Array.from(talkingMap.values()),
-        ].sort((a, b) => a.startTime - b.startTime);
+        console.log("result", result);
+        const mergedDescriptions = [];
 
+        // Iterate through the new descriptions and timestamps
+        for (let i = 0; i < result.descriptions.length; i++) {
+          mergedDescriptions.push({
+            startTime: result.timestamps[i][0],
+            endTime: result.timestamps[i][1],
+            description: result.descriptions[i],
+            audioFile: result.audio_files[i], // Add audio file if needed
+            isEdited: true,
+          });
+        }
+
+        console.log("mergedDescriptions Before", mergedDescriptions);
+        // Add the "talking" scenes
+        mergedDescriptions.push(...Array.from(talkingMap.values()));
+        console.log("mergedDescriptions After", mergedDescriptions);
+        mergedDescriptions.sort((a, b) => a.startTime - b.startTime);
+
+        console.log("mergedDescriptions", mergedDescriptions);
         setVideoDescriptions(mergedDescriptions);
         setPreviousDescriptions(mergedDescriptions);
+        setModalOpen(false);
         showNotification(
           "Success",
           "Video reanalyzed successfully!",
@@ -452,10 +484,13 @@ const Workspace3: React.FC = () => {
         );
       } else {
         const error = await response.json();
+        console.error("Reanalysis error:", error);
+        setModalOpen(false);
         showNotification("Error", error.error || "Unknown error", "error");
       }
     } catch (error) {
       console.error("Reanalysis error:", error);
+      setModalOpen(false);
       showNotification(
         "Connection Error",
         "Failed to connect to server",
@@ -560,6 +595,7 @@ const Workspace3: React.FC = () => {
         "error"
       );
     } finally {
+      setModalOpen(false);
       setIsProcessing(false); // End processing state
       setProcessingProgress(0);
       setProcessingMessage("");
@@ -642,13 +678,53 @@ const Workspace3: React.FC = () => {
     });
   };
 
+  // const handleSave = async () => {
+  //   if (!videoDescriptions.length) {
+  //     showNotification(
+  //       "No Content",
+  //       "Please process a video and ensure descriptions are available.",
+  //       "error"
+  //     );
+  //     return;
+  //   }
+
+  //   const currentDate = new Date().toLocaleDateString();
+  //   let screenshot = "";
+
+  //   if (uploadedVideo) {
+  //     try {
+  //       screenshot = await generateThumbnail(uploadedVideo);
+  //     } catch (error) {
+  //       console.error("Thumbnail generation failed:", error);
+  //       showNotification("Warning", "Failed to generate thumbnail.", "warning");
+  //     }
+  //   }
+  //   console.log(videoDescriptionsStorage);
+  //   setVideoDescriptionsStorage([
+  //     ...videoDescriptionsStorage.filter((item) => item.name !== projectName),
+  //     {
+  //       name: projectName,
+  //       data: videoDescriptions,
+  //       date: currentDate,
+  //       videoName: videoName || "",
+  //       screenshot,
+  //       videoUrl: videoDownloadUrl,
+  //       srtUrl: srtDownloadUrl,
+  //       audioUrl: talkingSrtUrl,
+  //     },
+  //   ]);
+  //   console.log(videoDescriptionsStorage);
+  //   showNotification(
+  //     "Success",
+  //     "Your work has been successfully saved!",
+  //     "success"
+  //   );
+  // };
+
+  // Add this check to handleSave
   const handleSave = async () => {
     if (!videoDescriptions.length) {
-      showNotification(
-        "No Content",
-        "Please process a video and ensure descriptions are available.",
-        "error"
-      );
+      showNotification("No Content", "Please process a video first.", "error");
       return;
     }
 
@@ -660,29 +736,30 @@ const Workspace3: React.FC = () => {
         screenshot = await generateThumbnail(uploadedVideo);
       } catch (error) {
         console.error("Thumbnail generation failed:", error);
-        showNotification("Warning", "Failed to generate thumbnail.", "warning");
       }
     }
 
+    // Create new storage array without current project
+    const updatedStorage = videoDescriptionsStorage.filter(
+      (item) => item.name !== projectName
+    );
+
+    // Add current project with new data
     setVideoDescriptionsStorage([
-      ...videoDescriptionsStorage.filter((item) => item.name !== projectName),
+      ...updatedStorage,
       {
         name: projectName,
         data: videoDescriptions,
         date: currentDate,
         videoName: videoName || "",
         screenshot,
-        videoUrl: `${backendBaseUrl}/downloads/${projectName}_processed.mp4`,
-        srtUrl: `${backendBaseUrl}/downloads/${projectName}_subtitles.srt`,
-        audioUrl: `${backendBaseUrl}/downloads/${projectName}_audio.mp3`,
+        videoUrl: videoDownloadUrl,
+        srtUrl: srtDownloadUrl,
+        audioUrl: talkingSrtUrl,
       },
     ]);
 
-    showNotification(
-      "Success",
-      "Your work has been successfully saved!",
-      "success"
-    );
+    showNotification("Success", "Work saved successfully!", "success");
   };
 
   const downloadFile = (url: string, filename: string) => {
@@ -745,6 +822,7 @@ const Workspace3: React.FC = () => {
     }
 
     try {
+      showNotification("Encoding...", "Encoding video...", "success");
       const response = await fetch(
         "http://localhost:5000/encode-video-with-subtitles",
         {
@@ -802,7 +880,129 @@ const Workspace3: React.FC = () => {
     }
   };
 
+  // const handleGenerateDescriptions = async (): Promise<void> => {
+  //   if (selectedScenes.size === 0) {
+  //     showNotification(
+  //       "No Selection",
+  //       "Please select scenes to generate descriptions",
+  //       "error"
+  //     );
+  //     return;
+  //   }
+  //   if (!uploadedVideo || !uploadedVideo.name) {
+  //     showNotification(
+  //       "Missing Video",
+  //       "Please upload a video before generating descriptions.",
+  //       "error"
+  //     );
+  //     return;
+  //   }
+  //   try {
+  //     // Set processing state to true at the start
+  //     setIsProcessing(true);
+
+  //     const selectedSceneData = videoDescriptions
+  //       .filter((scene) => selectedScenes.has(scene.startTime))
+  //       .map((scene) => ({
+  //         start: scene.startTime,
+  //         end: scene.endTime,
+  //         current_description: scene.description,
+  //       }));
+
+  //     const payload = {
+  //       video_name: uploadedVideo.name,
+  //       scenes: selectedSceneData,
+  //     };
+
+  //     const response = await fetch(
+  //       "http://localhost:5000/regenerate-descriptions",
+  //       {
+  //         method: "POST",
+  //         headers: { "Content-Type": "application/json" },
+  //         body: JSON.stringify(payload),
+  //       }
+  //     );
+
+  //     if (!response.ok || !response.body) {
+  //       throw new Error("Failed to generate descriptions");
+  //     }
+  //     const reader = response.body.getReader();
+  //     const decoder = new TextDecoder();
+  //     let updatedDescriptions = [...videoDescriptions];
+
+  //     while (true) {
+  //       const { done, value } = await reader.read();
+  //       if (done) break;
+
+  //       const chunks = decoder.decode(value).split("\n");
+  //       for (const chunk of chunks) {
+  //         if (!chunk) continue;
+
+  //         try {
+  //           const data = JSON.parse(chunk);
+
+  //           // Handle progress updates
+  //           if (data.progress !== undefined) {
+  //             setProcessingProgress(data.progress);
+  //             setProcessingMessage(data.message || "");
+  //           }
+  //           console.log("data", data);
+  //           // Handle final response with updated descriptions
+  //           if (data.progress === 100 && data.data) {
+  //             console.log("data.data", data.data);
+  //             const newDescriptions = data.data.descriptions;
+  //             const newAudioFiles = data.data.audio_files;
+
+  //             updatedDescriptions = updatedDescriptions.map((scene) => {
+  //               const matchingSceneIndex = selectedSceneData.findIndex(
+  //                 (selectedScene) => selectedScene.start === scene.startTime
+  //               );
+
+  //               if (matchingSceneIndex !== -1) {
+  //                 return {
+  //                   ...scene,
+  //                   description:
+  //                     newDescriptions[matchingSceneIndex] || scene.description,
+  //                   audioFile:
+  //                     newAudioFiles[matchingSceneIndex] || scene.audioFile,
+  //                   isEdited: true,
+  //                 };
+  //               }
+  //               return scene; // Return original scene if not selected
+  //             });
+  //           }
+  //         } catch (e) {
+  //           console.error("Error parsing JSON chunk:", e);
+  //         }
+  //       }
+  //     }
+  //     console.log("updatedDescriptions", updatedDescriptions);
+  //     // Update state with final descriptions
+  //     setVideoDescriptions(updatedDescriptions);
+  //     setPreviousDescriptions(updatedDescriptions);
+  //     showNotification(
+  //       "Success",
+  //       "Descriptions updated successfully!",
+  //       "success"
+  //     );
+  //     setModalOpen(false); // Close the modal here
+  //   } catch (error) {
+  //     console.error("Description generation error:", error);
+  //     showNotification(
+  //       "Error",
+  //       error instanceof Error ? error.message : "Unknown error",
+  //       "error"
+  //     );
+  //   } finally {
+  //     setIsProcessing(false);
+  //     setProcessingProgress(0);
+  //     setProcessingMessage("");
+  //     setModalOpen(false); // Ensure modal is closed in finally as well
+  //   }
+  // };
+
   const handleGenerateDescriptions = async (): Promise<void> => {
+    console.log("Hello")
     if (selectedScenes.size === 0) {
       showNotification(
         "No Selection",
@@ -811,7 +1011,7 @@ const Workspace3: React.FC = () => {
       );
       return;
     }
-    if (!uploadedVideo || !uploadedVideo.name) {
+    if (!uploadedVideo?.name) {
       showNotification(
         "Missing Video",
         "Please upload a video before generating descriptions.",
@@ -819,10 +1019,9 @@ const Workspace3: React.FC = () => {
       );
       return;
     }
+    console.log("Hello")
     try {
-      // Set processing state to true at the start
       setIsProcessing(true);
-
       const selectedSceneData = videoDescriptions
         .filter((scene) => selectedScenes.has(scene.startTime))
         .map((scene) => ({
@@ -830,27 +1029,25 @@ const Workspace3: React.FC = () => {
           end: scene.endTime,
           current_description: scene.description,
         }));
-
-      const payload = {
-        video_name: uploadedVideo.name,
-        scenes: selectedSceneData,
-      };
-
+      console.log("starting");
       const response = await fetch(
         "http://localhost:5000/regenerate-descriptions",
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
+          body: JSON.stringify({
+            video_name: uploadedVideo.name,
+            scenes: selectedSceneData,
+          }),
         }
       );
 
       if (!response.ok || !response.body) {
         throw new Error("Failed to generate descriptions");
       }
+
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
-      let updatedDescriptions = [...videoDescriptions];
 
       while (true) {
         const { done, value } = await reader.read();
@@ -863,26 +1060,31 @@ const Workspace3: React.FC = () => {
           try {
             const data = JSON.parse(chunk);
 
-            // Handle progress updates
             if (data.progress !== undefined) {
               setProcessingProgress(data.progress);
               setProcessingMessage(data.message || "");
             }
-
-            // Handle final response with updated descriptions
+            console.log("data", data);
             if (data.progress === 100 && data.data) {
-              console.log(data.data);
-              updatedDescriptions = updatedDescriptions.map((scene, index) => ({
-                ...scene,
-                description: data.data.descriptions[index] || scene.description,
-                audioFile: data.data.audio_files[index] || scene.audioFile,
-                isEdited: true,
-              }));
-            }
+              const newDescriptions = videoDescriptions.map((scene) => {
+                const index = data.data.timestamps.findIndex(
+                  ([start, end]: number[]) =>
+                    start === scene.startTime && end === scene.endTime
+                );
 
-            // Handle errors
-            if (data.error) {
-              throw new Error(data.error);
+                if (index !== -1) {
+                  return {
+                    ...scene,
+                    description: data.data.descriptions[index],
+                    audioFile: data.data.audio_files[index],
+                    isEdited: true,
+                  };
+                }
+                return scene;
+              });
+
+              setVideoDescriptions(newDescriptions);
+              setPreviousDescriptions(newDescriptions);
             }
           } catch (e) {
             console.error("Error parsing JSON chunk:", e);
@@ -890,9 +1092,6 @@ const Workspace3: React.FC = () => {
         }
       }
 
-      // Update state with final descriptions
-      setVideoDescriptions(updatedDescriptions);
-      setPreviousDescriptions(updatedDescriptions);
       showNotification(
         "Success",
         "Descriptions updated successfully!",
@@ -906,10 +1105,10 @@ const Workspace3: React.FC = () => {
         "error"
       );
     } finally {
-      // Always set processing state to false
       setIsProcessing(false);
       setProcessingProgress(0);
       setProcessingMessage("");
+      setModalOpen(false);
     }
   };
 
@@ -930,6 +1129,21 @@ const Workspace3: React.FC = () => {
         "error"
       );
       return;
+    }
+  };
+
+  const getAlertClassName = (
+    type: "default" | "error" | "warning" | "success"
+  ) => {
+    switch (type) {
+      case "error":
+        return "backdrop-blur-sm bg-red-800/70 text-white border border-red-500 p-4 rounded-lg shadow-lg";
+      case "warning":
+        return "backdrop-blur-sm bg-yellow-800/70 text-white border border-yellow-500 p-4 rounded-lg shadow-lg";
+      case "success":
+        return "backdrop-blur-sm bg-green-800/70 text-white border border-green-500 p-4 rounded-lg shadow-lg";
+      default: // "default" or any other case
+        return "backdrop-blur-sm bg-gray-900/70 text-white border border-gray-500 p-4 rounded-lg shadow-lg";
     }
   };
 
@@ -958,6 +1172,8 @@ const Workspace3: React.FC = () => {
           onRegenerateAudio={handleRegenerateAudio}
           videoFile={videoFile}
           setVideoFile={setVideoFile}
+          setModalOpen={setModalOpen}
+          isModalOpen={isModalOpen}
         />
         {notification && (
           <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 max-w-md animate-in fade-in slide-in-from-top-2">
@@ -965,15 +1181,14 @@ const Workspace3: React.FC = () => {
               variant={
                 notification.type === "error" ? "destructive" : "default"
               }
-              className={`
-        ${notification.type === "success" && "border-green-500 text-green-500"}
-        ${
-          notification.type === "warning" && "border-yellow-500 text-yellow-500"
-        }
-      `}
+              className={getAlertClassName(notification.type)} // Dynamic class name
             >
-              <AlertTitle>{notification.title}</AlertTitle>
-              <AlertDescription>{notification.message}</AlertDescription>
+              <AlertTitle className="font-semibold">
+                {notification.title}
+              </AlertTitle>
+              <AlertDescription className="mt-1">
+                {notification.message}
+              </AlertDescription>
             </Alert>
           </div>
         )}
@@ -1071,14 +1286,14 @@ const Workspace3: React.FC = () => {
             >
               <Upload className="w-6 h-6" />
             </Button>
-            <Button
+            {/* <Button
               variant="default"
               className="p-3 rounded-full shadow-md hover:bg-blue-600 transition"
               onClick={downloadAll}
               disabled={!videoDownloadUrl || !srtDownloadUrl || !talkingSrtUrl}
             >
               <Download className="w-6 h-6" />
-            </Button>
+            </Button> */}
           </div>
         </div>
       </main>

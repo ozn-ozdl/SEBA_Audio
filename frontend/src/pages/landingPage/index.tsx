@@ -82,9 +82,9 @@ const LandingPage: React.FC = () => {
         </p>
         <Button
           className="mt-8 px-8 py-4 bg-indigo-600 text-white text-lg rounded-full shadow-md hover:bg-indigo-500 transition"
-          onClick={() => (window.location.href = "/dashboard")}
+          onClick={() => (window.location.href = "/login")}
         >
-          Get Started for Free
+          Get Started
         </Button>
       </section>
 
@@ -95,7 +95,7 @@ const LandingPage: React.FC = () => {
         <div className="w-full max-w-4xl">
           <video
             controls
-            src="/demo/30_seconds_test_video.mp4"
+            src="/demo/30_seconds_test_video_speed.mp4"
             className="w-full h-auto rounded-lg shadow-lg mb-8"
           ></video>
         </div>
@@ -103,11 +103,11 @@ const LandingPage: React.FC = () => {
           ...Into this
         </h2>
         <div className="w-full max-w-4xl">
-          <img
-            src="/demo/visualization.png"
-            alt="Audio description visualization"
-            className="w-full h-auto rounded-lg shadow-lg"
-          />
+          <video
+            controls
+            src="/demo/processed_30_seconds_test_video.mp4"
+            className="w-full h-auto rounded-lg shadow-lg mb-8"
+          ></video>
         </div>
       </section>
 

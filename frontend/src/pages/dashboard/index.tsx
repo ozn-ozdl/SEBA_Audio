@@ -1,6 +1,6 @@
 import { Button } from "src/components/ui/button";
 import { useNavigate } from "react-router-dom";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useLocalStorage } from "@uidotdev/usehooks";
 import {
   Table,
@@ -11,7 +11,12 @@ import {
   TableRow,
 } from "../../components/ui/table";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faTrash, faFolderOpen } from "@fortawesome/free-solid-svg-icons";
+import {
+  faTrash,
+  faFolderOpen,
+  faSignOutAlt,
+} from "@fortawesome/free-solid-svg-icons";
+import { Download } from "lucide-react";
 
 interface VideoDescriptionItem {
   startTime: number;
@@ -27,14 +32,24 @@ interface ProjectData {
   date: string;
   videoName: string;
   screenshot?: string;
+  videoUrl?: string;
+  srtUrl?: string;
+  audioUrl?: string;
 }
 
 export function Dashboard() {
   const navigate = useNavigate();
   const [projectName, setProjectName] = useState("");
+  const loggedInUser = JSON.parse(localStorage.getItem("loggedInUser") || "{}");
+  const [userName, setUserName] = useState(loggedInUser.name || "User");
 
   const [videoDescriptionsStorage, setVideoDescriptionsStorage] =
     useLocalStorage<ProjectData[]>("video_descriptions", []);
+
+  const handleLogout = () => {
+    localStorage.removeItem("loggedInUser");
+    navigate("/");
+  };
 
   const handleCreateProject = (): void => {
     if (!projectName.trim()) {
@@ -57,10 +72,48 @@ export function Dashboard() {
     setVideoDescriptionsStorage(updatedProjects);
   };
 
+  const downloadFile = (url: string, filename: string) => {
+    console.log("Downloading from:", url);
+    fetch(url)
+      .then((response) => response.blob())
+      .then((blob) => {
+        const link = document.createElement("a");
+        link.href = URL.createObjectURL(blob);
+        link.setAttribute("download", filename);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(link.href); // Clean up the URL object
+      })
+      .catch((error) => {
+        console.error("Download error:", error);
+      });
+  };
+
+  const extractFilename = (url: string): string => {
+    const parts = url.split("/");
+    return parts[parts.length - 1];
+  };
+
+  const downloadAll = (item: ProjectData) => {
+    console.log(item);
+    if (item.videoUrl && item.srtUrl && item.audioUrl) {
+      downloadFile(item.videoUrl, extractFilename(item.videoUrl));
+      downloadFile(item.srtUrl, extractFilename(item.srtUrl));
+      downloadFile(item.audioUrl, extractFilename(item.audioUrl));
+    }
+  };
+
+  const isDownloadEnabled = (item: ProjectData): boolean => {
+    return !!(item.videoUrl && item.srtUrl && item.audioUrl);
+  };
+
   return (
     <div className="p-6">
       <header className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold text-gray-700">Dashboard</h1>
+        <h1 className="text-2xl font-bold text-gray-700">
+          Dashboard of {userName}{" "}
+        </h1>
         <div className="flex space-x-4">
           <input
             type="text"
@@ -75,6 +128,14 @@ export function Dashboard() {
           >
             Create Project
           </Button>
+
+          <Button
+            className="bg-red-500 text-white hover:bg-red-600 flex items-center space-x-2"
+            onClick={handleLogout}
+          >
+            <FontAwesomeIcon icon={faSignOutAlt} />
+            <span>Logout</span>
+          </Button>
         </div>
       </header>
 
@@ -86,6 +147,7 @@ export function Dashboard() {
               <TableHead className="p-2 text-gray-600">Last Updated</TableHead>
               <TableHead className="p-2 text-gray-600">Screenshot</TableHead>
               <TableHead className="p-2 text-gray-600">Actions</TableHead>
+              <TableHead className="p-2 text-gray-600">Download Data</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -129,6 +191,20 @@ export function Dashboard() {
                         <FontAwesomeIcon icon={faTrash} /> Delete
                       </Button>
                     </div>
+                  </TableCell>
+                  <TableCell className="p-2 text-gray-600">
+                    <Button
+                      variant="link"
+                      className={`text-indigo-500 hover:underline ${
+                        !isDownloadEnabled(item)
+                          ? "opacity-50 cursor-default"
+                          : ""
+                      }`}
+                      onClick={() => downloadAll(item)}
+                      disabled={!isDownloadEnabled(item)}
+                    >
+                      <Download />
+                    </Button>
                   </TableCell>
                 </TableRow>
               ))

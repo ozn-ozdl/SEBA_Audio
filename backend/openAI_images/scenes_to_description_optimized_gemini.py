@@ -15,8 +15,18 @@ genai.configure(api_key=GEMINI_API_KEY)
 
 
 def generate_video_description_with_gemini(video_file_path):
-    # Upload the video and print a confirmation.
+    """
+    Generate a concise audio description for a video scene using the Gemini API.
 
+    Args:
+        video_file_path (str): The path to the video file.
+
+    Returns:
+        str: A one-sentence description of the visual content in the video scene.
+
+    Raises:
+        ValueError: If the video upload fails.
+    """
     video_file = genai.upload_file(path=video_file_path)
     while video_file.state.name == "PROCESSING":
         print('.', end='')
@@ -46,6 +56,20 @@ def generate_video_description_with_gemini(video_file_path):
 
 
 def describe_scenes_with_gemini_video(video_file, timestamps, output_dir):
+    """
+    Extract scenes from a video based on provided timestamps and generate audio descriptions for each scene.
+
+    Args:
+        video_file (str): Path to the input video file.
+        timestamps (list): List of tuples (start, end) representing scene timestamps.
+        output_dir (str): Directory where the extracted scene video files will be saved.
+
+    Returns:
+        tuple: A tuple containing:
+            - list: Scene descriptions for each extracted scene.
+            - list: List of timestamp tuples (start, end) for each scene.
+            - list: List of scene video file names.
+    """
     output_files = []
     tuple_timestamps = []
     for idx, (start, end) in enumerate(timestamps):
@@ -70,6 +94,15 @@ def describe_scenes_with_gemini_video(video_file, timestamps, output_dir):
 
 
 def detect_scenes(video_path):
+    """
+    Detect scene changes in a video using the SceneDetect library.
+
+    Args:
+        video_path (str): Path to the input video file.
+
+    Returns:
+        list: A list of tuples, each containing the start and end timecodes (as strings) for a detected scene.
+    """
     video_manager = VideoManager([video_path])
     scene_manager = SceneManager()
 
@@ -87,10 +120,32 @@ def detect_scenes(video_path):
 
 
 def scene_list_to_string_list(scene_list):
+    """
+    Convert a list of scene timecode tuples into a list of formatted string representations.
+
+    Args:
+        scene_list (list): List of tuples, where each tuple contains (start, end) timecodes.
+
+    Returns:
+        list: List of strings in the format "start - end" for each scene.
+    """
     return [f"{start} - {end}" for (start, end) in scene_list]
 
 
 def get_talking_timestamps_with_gemini(video_file_path):
+    """
+    Retrieve timestamps for when persons are talking in a video using the Gemini API.
+
+    Args:
+        video_file_path (str): Path to the video file.
+
+    Returns:
+        str: A plain text list of talking timestamps in the format "HH:MM:SS - HH:MM:SS", 
+             or "NO_TALKING" if no talking is detected.
+
+    Raises:
+        ValueError: If the video upload fails.
+    """
     video_file = genai.upload_file(path=video_file_path)
     while video_file.state.name == "PROCESSING":
         print('.', end='')
@@ -119,10 +174,29 @@ def get_talking_timestamps_with_gemini(video_file_path):
 
 
 def format_talking_timestamps(talking_timestamps):
+    """
+    Format a list of talking timestamps by ensuring each timestamp is prefixed with "00:".
+
+    Args:
+        talking_timestamps (list): List of timestamp strings in the format "HH:MM:SS - HH:MM:SS".
+
+    Returns:
+        list: List of formatted timestamp strings in the format "00:HH:MM:SS - 00:HH:MM:SS".
+    """
     return [f"00:{start} - 00:{end}" for ts in talking_timestamps for (start, end) in [ts.split(" - ")]]
 
 
 def combine_speaking_and_scenes(scenes, talkings):
+    """
+    Combine scene and talking timestamps by merging them and filtering out short scenes.
+
+    Args:
+        scenes (list): List of scene time intervals as strings in the format "HH:MM:SS - HH:MM:SS".
+        talkings (list): List of talking timestamp strings in the same format.
+
+    Returns:
+        list: List of merged and filtered time intervals formatted as tuples of strings ("HH:MM:SS", "HH:MM:SS").
+    """
     scenes_int = time_interval_to_seconds(scenes)
     talkings_int = time_interval_to_seconds(talkings)
 
@@ -136,6 +210,15 @@ def combine_speaking_and_scenes(scenes, talkings):
 
 
 def time_interval_to_seconds(intervals):
+    """
+    Convert a list of time intervals from string format to seconds.
+
+    Args:
+        intervals (list): List of time interval strings in the format "HH:MM:SS - HH:MM:SS".
+
+    Returns:
+        list: List of tuples where each tuple contains the start and end times in seconds.
+    """
     intervals_int = []
 
     def time_to_seconds(time_str):
@@ -153,6 +236,16 @@ def time_interval_to_seconds(intervals):
 
 
 def get_valid_scenes(talkings, end_time):
+    """
+    Determine valid non-talking scene intervals based on talking timestamps.
+
+    Args:
+        talkings (list): List of tuples (start, end) in seconds representing talking intervals.
+        end_time (int): The end time of the video in seconds.
+
+    Returns:
+        list: List of tuples representing valid non-talking scene intervals.
+    """
     result = []
     last_end = 0
 
@@ -168,6 +261,16 @@ def get_valid_scenes(talkings, end_time):
 
 
 def merge_scenes_and_talkings(scenes, valid_scenes):
+    """
+    Merge scene intervals with valid non-talking intervals based on talking timestamps.
+
+    Args:
+        scenes (list): List of tuples (start, end) in seconds representing scene intervals.
+        valid_scenes (list): List of tuples (start, end) in seconds representing valid non-talking intervals.
+
+    Returns:
+        list: List of merged scene intervals as tuples (start, end) in seconds.
+    """
     merged_result = []
     valid_index = 0
 

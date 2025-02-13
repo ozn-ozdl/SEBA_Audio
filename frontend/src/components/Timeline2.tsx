@@ -633,7 +633,7 @@ const TimelineVisualizer: React.FC<TimelineVisualizerProps> = ({
         className="absolute z-30 text-white rounded-full p-3 shadow-lg transition-transform transform hover:scale-105"
         style={{
           left: `${currentTime * 100 - 16}px`,
-          top: "-24px",
+          top: "-16px",
           background: "linear-gradient(to right, #14b8a6, #0f766e)",
         }}
         onClick={addNewScene}
