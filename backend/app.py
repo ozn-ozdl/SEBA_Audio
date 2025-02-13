@@ -533,41 +533,6 @@ def _create_mixed_audio(audio_files, start_times):
     ], check=True)
     return output
 
-def milliseconds_to_srt_time(ms):
-    """Convert milliseconds to SRT format (HH:MM:SS,mmm)"""
-    hours, ms = divmod(ms, 3600000)
-    minutes, ms = divmod(ms, 60000)
-    seconds, ms = divmod(ms, 1000)
-    return f"{hours:02d}:{minutes:02d}:{seconds:02d},{ms:03fd}"
-
-def get_audio_duration(audio_file):
-    """Get the duration of an audio file in seconds"""
-    result = subprocess.run(
-        ["ffprobe", "-v", "error", "-show_entries", "format=duration",
-         "-of", "default=noprint_wrappers=1:nokey=1", audio_file],
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE
-    )
-    return float(result.stdout)
-
-def speed_up_audio(audio_file, speed_factor, output_file):
-    """Speed up audio by a given factor"""
-    subprocess.run([
-        "ffmpeg", "-y", "-i", audio_file,
-        "-filter:a", f"atempo={speed_factor}",
-        output_file
-    ], check=True)
-
-def _create_temp_file(srt_content):
-    """Create a temporary file for SRT content"""
-    srt_file = tempfile.NamedTemporaryFile(suffix=".srt", delete=False)
-    with open(srt_file.name, 'w') as f:
-        f.writelines(srt_content)
-    return srt_file.name
-
-
-
-
 @app.route("/get-video", methods=["GET"])
 def get_video():
     video_name = request.args.get("videoName")
@@ -737,16 +702,6 @@ def get_audio_duration(file_path):
         raise RuntimeError(f"Failed to get audio duration: {result.stderr}")
     return float(result.stdout.strip())
 
-def milliseconds_to_srt_time(ms):
-    """Convert milliseconds to SRT timestamp format (HH:MM:SS,mmm)"""
-    ms = int(ms)
-    hours = ms // 3600000
-    ms %= 3600000
-    minutes = ms // 60000
-    ms %= 60000
-    seconds = ms // 1000
-    milliseconds = ms % 1000
-    return f"{hours:02d}:{minutes:02d}:{seconds:02d},{milliseconds:03d}"
 
 def timestamp_to_seconds(ms):
     """Convert milliseconds timestamp to total seconds"""
