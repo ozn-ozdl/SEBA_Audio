@@ -4,12 +4,12 @@ import { BrowserRouter, Route, Routes, Navigate } from "react-router-dom";
 import "./index.css";
 import { Dashboard } from "./pages/dashboard/index";
 import LandingPage from "./pages/landingPage";
-import { WorkSpace } from "./pages/workspace/index";
+import { WorkSpace } from "./pages/workspace/oldFiles/index";
 import { SideBar } from "./components/SideBar";
 import reportWebVitals from "./reportWebVitals";
 import PrivateRoute from "./routes/PrivateRoute";
 
-import Workspace2 from "./pages/workspace/index2";
+import Workspace2 from "./pages/workspace/oldFiles/index2";
 import Workspace3 from "./pages/workspace/index3";
 import App from "./App";
 import Tutorial from "./pages/tutorial/index";

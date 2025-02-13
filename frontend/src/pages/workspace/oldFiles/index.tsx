@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
-import VideoUploader from "../../components/VideoUploader";
-import VideoDescription from "../../components/VideoDescription";
+import VideoUploader from "../../../components/VideoUploader";
+import VideoDescription from "../../../components/VideoDescription";
 import {
   Video,
   FileOutput,

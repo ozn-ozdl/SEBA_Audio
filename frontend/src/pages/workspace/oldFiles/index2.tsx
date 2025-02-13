@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Video, Play, Pause, Save } from "lucide-react";
-import TranscriptionEditor2 from "src/components/Editor2";
+import TranscriptionEditor2 from "src/components/oldFiles/Editor2";
 import { useLocalStorage } from "@uidotdev/usehooks";
 
 interface VideoDescriptionItem {

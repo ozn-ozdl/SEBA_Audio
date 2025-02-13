@@ -1,8 +1,17 @@
 import os
 import subprocess
 
-
 def frame_to_time(frame, fps):
+    """
+    Converts a frame number to a timestamp in HH:MM:SS format.
+    
+    Args:
+        frame (int): The frame number.
+        fps (float): Frames per second of the video.
+    
+    Returns:
+        str: The timestamp in HH:MM:SS format.
+    """
     seconds = frame / fps
     hours = int(seconds // 3600)
     minutes = int((seconds % 3600) // 60)
@@ -11,6 +20,20 @@ def frame_to_time(frame, fps):
 
 
 def extract_scenes(video_path, timestamps, output_folder):
+    """
+    Extracts scenes from a video based on given timestamps and saves them as separate video files.
+    
+    Args:
+        video_path (str): Path to the input video file.
+        timestamps (list of tuple): List of (start_time, end_time) tuples representing scene durations.
+        output_folder (str): Path to the directory where extracted scenes will be saved.
+    
+    Returns:
+        list: A list of filenames of the extracted scene video files.
+    
+    Raises:
+        subprocess.CalledProcessError: If FFmpeg execution fails.
+    """
     file_paths = []
     for i, (start, end) in enumerate(timestamps):
         output_file = os.path.join(output_folder, f"scene_{i + 1}.mp4")
@@ -35,6 +58,18 @@ def extract_scenes(video_path, timestamps, output_folder):
 
 
 def get_timestamps_and_descriptions(scenes, fps, frames_per_second, descriptions):
+    """
+    Computes timestamps and retrieves descriptions for scenes.
+    
+    Args:
+        scenes (list of list): List of lists, where each sublist contains filenames of frames in a scene.
+        fps (float): Frames per second of the video.
+        frames_per_second (float): Threshold for detecting scene transitions.
+        descriptions (list of str): Descriptions corresponding to different scenes.
+    
+    Returns:
+        tuple: A tuple containing a list of (start_time, end_time) timestamps and a list of scene descriptions.
+    """
     timestamps = []
     descriptions_final = []
 
